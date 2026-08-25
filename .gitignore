@@ -8,3 +8,7 @@ wheels/
 
 # Virtual environments
 .venv
+
+# C# / .NET build output (frontend)
+[Bb]in/
+[Oo]bj/
