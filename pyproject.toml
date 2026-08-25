@@ -1,0 +1,26 @@
+[project]
+name = "nota"
+version = "0.1.0"
+description = "Node-based data analysis backend on polars"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "polars==1.32.3",
+]
+
+[project.optional-dependencies]
+viz = ["networkx>=3", "matplotlib>=3.7"]
+io = ["fastexcel>=0.10"]   # source.excel
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["covers(kind): marks a behavioral test as covering a builtin node kind"]
+
+[build-system]
+requires = ["setuptools >= 68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["nota*"]
+exclude = ["notebooks*", "res*", "build*", "*.egg-info*", "tests*"]
