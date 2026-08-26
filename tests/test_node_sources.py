@@ -63,6 +63,15 @@ def test_excel(tmp_path):
     assert _scan("source.excel", str(f)) == ROWS
 
 
+@covers("source.sample")
+def test_sample():
+    g = Graph().add("src", "source.sample").add("pv", "sink.preview")
+    g.connect("src", "pv", "frame")
+    out = preview_of(g)
+    assert out["columns"] == ["id", "name", "score"]
+    assert out["shape"][0] == 5
+
+
 def test_missing_file_raises_early(tmp_path):
     with pytest.raises(FileNotFoundError):
         _scan("source.csv", str(tmp_path / "nope.csv"))

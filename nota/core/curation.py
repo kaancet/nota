@@ -34,6 +34,7 @@ def hidden(kind: str) -> bool:
 # harmless (it just never matches), so this can be generous.
 COMMON: dict[str, tuple[str, str]] = {
     # Source / Column / Literal
+    "source.sample": ("Source", "Sample data"),
     "source.csv": ("Source", "Read CSV"), "source.parquet": ("Source", "Read Parquet"),
     "source.auto": ("Source", "Read File"),
     "expr.column": ("Column", "Column"), "expr.columns": ("Column", "Columns"),

@@ -2,12 +2,56 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Nota"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="Nota.MainWindow"
         Title="nota"
-        Width="600" Height="500">
-    <StackPanel Margin="24" Spacing="10">
-        <TextBlock Text="nota backend" FontSize="18" FontWeight="Bold"/>
-        <TextBlock x:Name="StatusText" Text="starting…" FontSize="14"/>
-    </StackPanel>
+        Width="1100" Height="700">
+
+    <!-- 5 columns: palette | splitter | center | splitter | info -->
+    <Grid ColumnDefinitions="220,4,*,4,280">
+
+        <!-- ============ LEFT: palette ============ -->
+        <!-- rows: title (Auto), status (Auto), list (* = fills the rest) -->
+        <Grid Grid.Column="0" Margin="8" RowDefinitions="Auto,Auto,Auto,*">
+            <TextBlock Grid.Row="0" Text="Palette" FontWeight="Bold" FontSize="14"/>
+            <TextBlock Grid.Row="1" x:Name="StatusText" Text="starting…" FontSize="11" TextWrapping="Wrap"/>
+            <Button Grid.Row="2" x:Name="RunButton" Content="▶ Run" Click="OnRun"
+                    Margin="0,6,0,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+            <ListBox Grid.Row="3" x:Name="NodeList" DoubleTapped="OnNodeActivated" Margin="0,6,0,0">
+                <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="local:NodeType">
+                        <TextBlock Text="{Binding Label}"/>   <!-- show each NodeType's Label -->
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Grid>
+
+        <GridSplitter Grid.Column="1" Background="#333"/>
+
+        <!-- ============ CENTER: canvas over output table ============ -->
+        <Grid Grid.Column="2" RowDefinitions="*,4,220">
+            <Canvas Grid.Row="0" x:Name="NodeCanvas" Background="#1E1E1E" ClipToBounds="True"/>
+            <GridSplitter Grid.Row="1" Background="#333" HorizontalAlignment="Stretch"/>
+            <Border Grid.Row="2" Background="#252526">
+                <Grid Margin="8" RowDefinitions="Auto,*">
+                    <TextBlock Grid.Row="0" Text="Output" FontWeight="Bold"/>
+                    <ScrollViewer Grid.Row="1" x:Name="OutputArea" HorizontalScrollBarVisibility="Auto">
+                        <TextBlock Text="(Run the graph, then click a node)" Foreground="#888"/>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <GridSplitter Grid.Column="3" Background="#333"/>
+
+        <!-- ============ RIGHT: node info ============ -->
+        <Border Grid.Column="4" Background="#252526">
+            <StackPanel Margin="8" Spacing="4">
+                <TextBlock Text="Node info" FontWeight="Bold"/>
+                <TextBlock x:Name="InfoPanel" Text="(click a node)" Foreground="#888" TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
+
+    </Grid>
 </Window>

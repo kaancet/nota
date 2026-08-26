@@ -16,6 +16,16 @@ def _require(path: str) -> str:
     return path
 
 
+@node("source.sample", "Source")
+def sample() -> pl.LazyFrame:
+    """A small built-in sample table (no file needed) -- handy for demos and testing."""
+    return pl.LazyFrame({
+        "id": [1, 2, 3, 4, 5],
+        "name": ["ana", "bob", "cy", "dan", "eve"],
+        "score": [8.5, 6.0, 9.1, 7.2, 5.4],
+    })
+
+
 @node("source.csv", "Source")
 def read_csv(path: str, *, separator: str = ",", has_header: bool = True) -> pl.LazyFrame:
     """Scan a CSV/TSV file lazily."""
