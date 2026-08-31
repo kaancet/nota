@@ -11,8 +11,8 @@ from nota.core.registry import node
 
 
 @node("sink.preview", "Sink")
-def preview_sink(frame: pl.LazyFrame, *, n: int = 50) -> dict:
-    """Show a frame in the table view (first n rows)."""
+def preview_sink(frame: object, *, n: int = 50) -> dict:
+    """Preview any value in the output panel: a table for a frame/series, or the value/expr otherwise."""
     return _preview(frame, n)
 
 

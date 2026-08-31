@@ -3,18 +3,26 @@ using System.Collections.Generic;
 namespace Nota;
 
 // One input or output port on a node type (from the manifest).
-public record Port(string Name, string Type, bool Variadic, bool Optional);
+public record Port(string Name, string Type, bool Variadic, bool Optional, string Doc = "");
 
-// A node kind from the manifest. Carries everything the palette, the ports
-// and the info panel will need. Category/Tier aren't displayed yet,
-// but we keep them now so the palette-grouping + color-coding ideas are cheap later.
+// One parameter (widget) on a node type (from the manifest).
+// Choices (enum) -> ComboBox. Widget (e.g. "kvlist") -> a special editor instead of a textbox.
+public record ParamSpec(string Name, string Type, object? Default, bool Required,
+                        string Doc = "", List<string>? Choices = null, string? Widget = null);
+
+// A node kind from the manifest. Carries everything the palette, the ports,
+// the params, and the info panel need.
 public record NodeType(
     string Kind,
     string Label,
     string Category,
     string Tier,
+    string Doc,
     List<Port> Inputs,
-    List<Port> Outputs);
+    List<Port> Outputs,
+    List<ParamSpec> Params,
+    string Examples = "",
+    string? DocUrl = null);
 
 
 // Identifies one specific port on one placed node. Stored on each port dot's Tag,
@@ -32,6 +40,10 @@ public class NodeInstance
     public NodeType Type { get; }      // get-only
     public double X { get; set; }      // get + set: mutable (dragging updates it)
     public double Y { get; set; }
+    public bool Collapsed { get; set; }   // node body hidden to just title + port stubs (#6)
+
+    // live param values (name -> value), seeded from the type's defaults, edited by widgets
+    public Dictionary<string, object?> Params { get; } = new();
 
     public NodeInstance(string id, NodeType type, double x, double y)
     {
@@ -39,5 +51,7 @@ public class NodeInstance
         Type = type;
         X = x;
         Y = y;
+        foreach (ParamSpec p in type.Params)
+            Params[p.Name] = p.Default;
     }
 }

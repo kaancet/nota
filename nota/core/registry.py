@@ -43,6 +43,7 @@ class PortSpec:
     type: str
     variadic: bool = False
     optional: bool = False
+    doc: str = ""  # per-port blurb from the docstring's Parameters section
 
 
 @dataclass
@@ -51,6 +52,8 @@ class ParamSpec:
     type: str
     default: Any
     required: bool
+    doc: str = ""  # per-param blurb from the docstring's Parameters section
+    choices: list | None = None  # enum values (from a Literal annotation) -> a dropdown in the UI
 
 
 @dataclass
@@ -64,6 +67,8 @@ class NodeSpec:
     params: list[ParamSpec]
     outputs: list[PortSpec]
     doc: str = ""
+    examples: str = ""  # docstring Examples section, verbatim
+    doc_url: str | None = None  # link to the polars API page, when one is derivable
     namespace: str | None = None  # sub-namespace method: call getattr(receiver, namespace).method(...)
 
     def invoke(self, inbound: dict[str, list], params: dict) -> Any:
@@ -98,9 +103,13 @@ class NodeSpec:
             "kind": self.kind,
             "category": self.category,
             "inputs": [vars(p) for p in self.inputs],
-            "params": [{**vars(p), "default": _jsonable(p.default)} for p in self.params],
+            "params": [{k: v for k, v in {**vars(p), "default": _jsonable(p.default)}.items()
+                        if not (k == "choices" and v is None)}  # omit choices unless present
+                       for p in self.params],
             "outputs": [vars(p) for p in self.outputs],
             "doc": self.doc,
+            "examples": self.examples,
+            "doc_url": self.doc_url,
         }
 
 
@@ -113,6 +122,8 @@ def _classify(ann: Any) -> str:
         return "frame"
     if "Series" in a:
         return "series"
+    if a in ("<class 'object'>", "object"):
+        return "any"   # an explicit `object` annotation -> a port that accepts anything
     return "scalar"
 
 
@@ -122,6 +133,45 @@ def _prim(ann: Any) -> str:
         if t in a:
             return t
     return "any"
+
+
+# namespace to resolve polars' string annotations (it uses `from __future__ import annotations`),
+# so a `mode: RoundMode` alias -> Literal[...] -> its allowed values.
+def _ann_ns() -> dict:
+    import typing
+
+    ns: dict = {"Literal": typing.Literal}
+    try:
+        import polars._typing as plt  # private, but where the Literal aliases live
+
+        ns.update(vars(plt))
+    except Exception:  # noqa: BLE001 - version drift; reflection just won't find choices
+        pass
+    return ns
+
+
+_ANN_NS = _ann_ns()
+
+
+def _literal_choices(ann: Any) -> list | None:
+    """The allowed string values if `ann` is (or wraps, e.g. `X | None`) a Literal of strings."""
+    import typing
+
+    if ann is inspect._empty:
+        return None
+    try:
+        t = eval(ann, _ANN_NS) if isinstance(ann, str) else ann  # noqa: S307 - trusted polars annotations
+    except Exception:  # noqa: BLE001 - unresolvable annotation -> no choices
+        return None
+    args = None
+    if typing.get_origin(t) is typing.Literal:
+        args = typing.get_args(t)
+    else:  # unwrap Optional / unions -> find a Literal member
+        for a in typing.get_args(t):
+            if typing.get_origin(a) is typing.Literal:
+                args = typing.get_args(a)
+                break
+    return list(args) if args and all(isinstance(x, str) for x in args) else None
 
 
 def _jsonable(v: Any) -> Any:
@@ -134,9 +184,65 @@ def _jsonable(v: Any) -> Any:
 
 _FAMILY_TYPE = {"Expr": "expr", "Series": "series"}  # everything else -> "frame"
 
+# family -> the polars docs reference subpath its members live under
+_DOC_GROUP = {"Expr": "expressions", "LazyFrame": "lazyframe", "DataFrame": "dataframe", "Series": "series"}
+
+
+def _doc_url(kind: str) -> str | None:
+    """Best-effort polars API page for a reflected member; None for custom nodes.
+    ponytail: only the four main families are mapped (covers every COMMON node);
+    pl.* top-level funcs are omitted rather than guess their scattered subpaths."""
+    group = _DOC_GROUP.get(kind.split(".")[0])
+    if group is None:
+        return None
+    return f"https://docs.pola.rs/api/python/stable/reference/{group}/api/polars.{kind}.html"
+
+
+def _parse_numpydoc(doc: str) -> tuple[dict[str, str], str]:
+    """Return ({param_name: blurb}, examples_text) from a numpydoc-style docstring."""
+    lines = doc.splitlines()
+    sections: dict[str, list[str]] = {}
+    cur: str | None = None
+    i = 0
+    while i < len(lines):
+        nxt = lines[i + 1].strip() if i + 1 < len(lines) else ""
+        if nxt and set(nxt) == {"-"}:  # a "Title\n-----" section header
+            cur = lines[i].strip().lower()
+            sections[cur] = []
+            i += 2
+            continue
+        if cur is not None:
+            sections[cur].append(lines[i])
+        i += 1
+    return _parse_param_block(sections.get("parameters", [])), "\n".join(sections.get("examples", [])).strip()
+
+
+def _parse_param_block(block: list[str]) -> dict[str, str]:
+    """numpydoc Parameters: a flush-left `name [: type]` header, then indented description.
+    A header may list several comma-separated names sharing one description."""
+    out: dict[str, str] = {}
+    names: list[str] = []
+    desc: list[str] = []
+
+    def flush() -> None:
+        text = " ".join(w.strip() for w in desc).strip()
+        for n in names:
+            out[n] = text
+
+    for line in block:
+        if line and not line[0].isspace():  # flush-left, non-blank -> a new entry header
+            flush()
+            desc = []
+            names = [n.strip() for n in line.split(":")[0].split(",") if n.strip()]
+        elif names:
+            desc.append(line)
+    flush()
+    return out
+
 
 def build_spec(fn: Callable, kind: str, category: str, is_method: bool, namespace: str | None = None) -> NodeSpec:
     sig = inspect.signature(fn)
+    param_docs, examples = _parse_numpydoc(inspect.getdoc(fn) or "")
     params = list(sig.parameters.values())
     slots: list[Slot] = []
     inputs: list[PortSpec] = []
@@ -156,21 +262,29 @@ def build_spec(fn: Callable, kind: str, category: str, is_method: bool, namespac
             inputs.append(PortSpec(p.name, t, variadic=True, optional=True))
         elif p.kind == p.VAR_KEYWORD:
             continue  # ignore **kwargs for the prototype
-        elif _classify(p.annotation) in ("expr", "frame", "series"):
+        elif _classify(p.annotation) in ("expr", "frame", "series", "any"):
             t = _classify(p.annotation)
             slots.append(Slot(PORT_OR_LITERAL, p.name, t))
             inputs.append(PortSpec(p.name, t, optional=True))
             pspecs.append(ParamSpec(p.name, "any", _default(p), False))
         elif p.default is inspect._empty:
             slots.append(Slot(PARAM_REQ, p.name, "scalar", p.kind != p.POSITIONAL_ONLY))
-            pspecs.append(ParamSpec(p.name, _prim(p.annotation), None, True))
+            choices = _literal_choices(p.annotation)
+            pspecs.append(ParamSpec(p.name, "str" if choices else _prim(p.annotation), None, True, choices=choices))
         else:
             slots.append(Slot(PARAM_KW, p.name, "scalar", p.kind != p.POSITIONAL_ONLY))
-            pspecs.append(ParamSpec(p.name, _prim(p.annotation), _default(p), False))
+            choices = _literal_choices(p.annotation)
+            pspecs.append(ParamSpec(p.name, "str" if choices else _prim(p.annotation), _default(p), False, choices=choices))
+
+    for p in inputs:
+        p.doc = param_docs.get(p.name, "")
+    for p in pspecs:
+        p.doc = param_docs.get(p.name, "")
 
     outputs = [PortSpec("out", _classify(sig.return_annotation))]
     doc = (inspect.getdoc(fn) or "").split("\n\n")[0]
-    return NodeSpec(kind, category, is_method, fn, slots, inputs, pspecs, outputs, doc, namespace)
+    return NodeSpec(kind, category, is_method, fn, slots, inputs, pspecs, outputs,
+                    doc, examples, _doc_url(kind), namespace)
 
 
 def _default(p) -> Any:

@@ -25,3 +25,20 @@ def test_catalog_groups_by_category():
     tree = catalog("common")
     assert "Transform" in tree and "Sink" in tree
     assert any(e["kind"] == "sink.preview" for e in tree["Sink"])
+
+
+def test_manifest_enrichment():
+    m = {e["kind"]: e for e in manifest("common")}
+    # #5 examples + doc_url derived from the reflected member
+    f = m["LazyFrame.filter"]
+    assert f["doc_url"].endswith("polars.LazyFrame.filter.html")
+    assert f["examples"]  # docstring Examples section captured
+    # #4 per-arg blurb parsed from the docstring's Parameters section
+    assert "boolean" in next(p for p in f["inputs"] if p["name"] == "predicates")["doc"].lower()
+    # #3 enum choices reflected from the param's Literal annotation -> a dropdown in the UI
+    how = next(p for p in m["LazyFrame.join"]["params"] if p["name"] == "how")
+    assert "inner" in how["choices"] and "cross" in how["choices"]
+    mode = next(p for p in m["Expr.round"]["params"] if p["name"] == "mode")
+    assert mode["choices"] == ["half_to_even", "half_away_from_zero"]   # RoundMode = Literal[...]
+    # custom nodes have no polars doc URL
+    assert m["sink.preview"]["doc_url"] is None

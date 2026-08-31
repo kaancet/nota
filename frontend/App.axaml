@@ -2,7 +2,42 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="Nota.App"
              RequestedThemeVariant="Default">
-             <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
+             <!-- "Default" follows the system theme; "Dark"/"Light" force one. Set via View > Theme. -->
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="NotaSurface"     Color="#252526"/>
+                    <SolidColorBrush x:Key="NotaCanvas"      Color="#1E1E1E"/>
+                    <SolidColorBrush x:Key="NotaGrid"        Color="#2A2A2E"/>
+                    <SolidColorBrush x:Key="NotaNodeBg"      Color="#2D2D30"/>
+                    <SolidColorBrush x:Key="NotaField"       Color="#3A3A3D"/>
+                    <SolidColorBrush x:Key="NotaText"        Color="#DCDCDC"/>
+                    <SolidColorBrush x:Key="NotaSubtext"     Color="#9AA0A6"/>
+                    <SolidColorBrush x:Key="NotaBorder"      Color="#3C3C40"/>
+                    <SolidColorBrush x:Key="NotaSplitter"    Color="#333333"/>
+                    <SolidColorBrush x:Key="NotaTableHeader" Color="#333338"/>
+                    <SolidColorBrush x:Key="NotaTableZebra"  Color="#2A2A2E"/>
+                    <SolidColorBrush x:Key="NotaAccent"      Color="#4C8DFF"/>
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="NotaSurface"     Color="#F0F0F0"/>
+                    <SolidColorBrush x:Key="NotaCanvas"      Color="#FAFAFA"/>
+                    <SolidColorBrush x:Key="NotaGrid"        Color="#E2E2E2"/>
+                    <SolidColorBrush x:Key="NotaNodeBg"      Color="#FFFFFF"/>
+                    <SolidColorBrush x:Key="NotaField"       Color="#E8E8E8"/>
+                    <SolidColorBrush x:Key="NotaText"        Color="#1A1A1A"/>
+                    <SolidColorBrush x:Key="NotaSubtext"     Color="#5F6368"/>
+                    <SolidColorBrush x:Key="NotaBorder"      Color="#CFCFCF"/>
+                    <SolidColorBrush x:Key="NotaSplitter"    Color="#C8C8C8"/>
+                    <SolidColorBrush x:Key="NotaTableHeader" Color="#E4E4E4"/>
+                    <SolidColorBrush x:Key="NotaTableZebra"  Color="#F3F3F3"/>
+                    <SolidColorBrush x:Key="NotaAccent"      Color="#1565C0"/>
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
 
     <Application.Styles>
         <FluentTheme />

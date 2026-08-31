@@ -5,6 +5,7 @@ description = "Node-based data analysis backend on polars"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "behaviz>=0.6.2",
     "polars==1.32.3",
 ]
 

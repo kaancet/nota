@@ -40,6 +40,8 @@ COMMON: dict[str, tuple[str, str]] = {
     "expr.column": ("Column", "Column"), "expr.columns": ("Column", "Columns"),
     "expr.col_regex": ("Column", "Columns by regex"), "expr.col_dtype": ("Column", "Columns by type"),
     "expr.lit": ("Literal", "Constant"),
+    "expr.const_int": ("Literal", "Integer"), "expr.const_float": ("Literal", "Float"),
+    "expr.const_str": ("Literal", "String"),
     # Transform (LazyFrame)
     "LazyFrame.filter": ("Transform", "Filter"), "LazyFrame.select": ("Transform", "Select"),
     "LazyFrame.with_columns": ("Transform", "With columns"), "LazyFrame.drop": ("Transform", "Drop"),
@@ -77,6 +79,18 @@ COMMON: dict[str, tuple[str, str]] = {
     # Sink
     "sink.preview": ("Sink", "Preview"), "sink.write_csv": ("Sink", "Write CSV"),
     "sink.write_parquet": ("Sink", "Write Parquet"),
+    # Plot (interactive bokeh via behaviz)
+    "sink.plot.line": ("Plot", "Line plot"), "sink.plot.scatter": ("Plot", "Scatter plot"),
+    "sink.plot.bar": ("Plot", "Bar plot"), "sink.plot.step": ("Plot", "Step plot"),
+    # Dict
+    "dict.build": ("Dict", "Dict builder"),
+}
+
+
+# widget hints: params whose value is edited by a special frontend widget rather than a
+# plain textbox. Injected onto the manifest entry; the frontend renders accordingly.
+WIDGETS: dict[str, dict[str, str]] = {
+    "dict.build": {"entries": "kvlist"},  # a dynamic key/value row editor
 }
 
 
@@ -98,4 +112,8 @@ def decorate(entry: dict) -> dict | None:
         entry["category"] = _default_category(kind)
         entry["label"] = kind.split(".")[-1].replace("_", " ")
         entry["tier"] = "advanced"
-    return entry
+    widgets = WIDGETS.get(kind, {})
+    for p in entry["params"]:
+        if p["name"] in widgets:
+            p["widget"] = widgets[p["name"]]
+    return entry  # enum `choices` now come from Literal reflection in registry.build_spec

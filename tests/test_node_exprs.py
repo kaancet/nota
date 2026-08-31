@@ -46,3 +46,30 @@ def test_lit():
     out = preview_of(g)
     assert out["columns"] == ["g", "v", "k"]
     assert out["rows"][0] == ["a", 1, 7]
+
+
+def _const_col(kind: str, value: object):
+    """Run test.source -> add a typed constant column -> preview the first cell of column 'k'."""
+    g = Graph().add("src", "test.source").add("k", kind, {"value": value})
+    g.add("al", "Expr.alias", {"name": "k"})
+    g.add("wc", "LazyFrame.with_columns").add("pv", "sink.preview")
+    g.connect("k", "al")
+    g.connect("src", "wc", "self")
+    g.connect("al", "wc", "exprs")
+    g.connect("wc", "pv")
+    return preview_of(g)["rows"][0][2]
+
+
+@covers("expr.const_int")
+def test_const_int():
+    assert _const_col("expr.const_int", 7) == 7
+
+
+@covers("expr.const_float")
+def test_const_float():
+    assert _const_col("expr.const_float", 2.5) == 2.5
+
+
+@covers("expr.const_str")
+def test_const_str():
+    assert _const_col("expr.const_str", "hi") == "hi"

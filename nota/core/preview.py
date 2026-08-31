@@ -42,8 +42,8 @@ def preview(value: Any, n: int = 50) -> dict:
       expr   -> {type, repr}
       scalar -> {type, value, dtype}
     """
-    if isinstance(value, dict) and value.get("type") in {"frame", "expr", "scalar"}:
-        return value  # already a payload (e.g. a sink.preview output) -> pass through
+    if isinstance(value, dict) and value.get("type") in {"frame", "expr", "scalar", "html"}:
+        return value  # already a payload (e.g. sink.preview / sink.plot output) -> pass through
     if isinstance(value, pl.Expr):
         return {"type": "expr", "repr": str(value)}
     if isinstance(value, pl.Series):

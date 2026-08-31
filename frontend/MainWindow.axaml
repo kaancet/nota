@@ -6,51 +6,82 @@
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="Nota.MainWindow"
         Title="nota"
-        Width="1100" Height="700">
+        Width="1500" Height="850">
+
+    <!-- native menu bar (global on macOS) -->
+    <NativeMenu.Menu>
+        <NativeMenu>
+            <NativeMenuItem Header="File">
+                <NativeMenuItem.Menu>
+                    <NativeMenu>
+                        <NativeMenuItem Header="Save…" Gesture="Cmd+S" Click="OnSave"/>
+                        <NativeMenuItem Header="Load…" Gesture="Cmd+O" Click="OnLoad"/>
+                    </NativeMenu>
+                </NativeMenuItem.Menu>
+            </NativeMenuItem>
+            <NativeMenuItem Header="View">
+                <NativeMenuItem.Menu>
+                    <NativeMenu>
+                        <NativeMenuItem Header="Theme">
+                            <NativeMenuItem.Menu>
+                                <NativeMenu>
+                                    <NativeMenuItem Header="Dark" Click="OnThemeDark"/>
+                                    <NativeMenuItem Header="Light" Click="OnThemeLight"/>
+                                    <NativeMenuItem Header="System" Click="OnThemeSystem"/>
+                                </NativeMenu>
+                            </NativeMenuItem.Menu>
+                        </NativeMenuItem>
+                    </NativeMenu>
+                </NativeMenuItem.Menu>
+            </NativeMenuItem>
+        </NativeMenu>
+    </NativeMenu.Menu>
 
     <!-- 5 columns: palette | splitter | center | splitter | info -->
     <Grid ColumnDefinitions="220,4,*,4,280">
 
         <!-- ============ LEFT: palette ============ -->
-        <!-- rows: title (Auto), status (Auto), list (* = fills the rest) -->
-        <Grid Grid.Column="0" Margin="8" RowDefinitions="Auto,Auto,Auto,*">
+        <!-- rows: title, status, run, search, list (* = fills the rest) -->
+        <Grid Grid.Column="0" Margin="8" RowDefinitions="Auto,Auto,Auto,Auto,*">
             <TextBlock Grid.Row="0" Text="Palette" FontWeight="Bold" FontSize="14"/>
             <TextBlock Grid.Row="1" x:Name="StatusText" Text="starting…" FontSize="11" TextWrapping="Wrap"/>
             <Button Grid.Row="2" x:Name="RunButton" Content="▶ Run" Click="OnRun"
                     Margin="0,6,0,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
-            <ListBox Grid.Row="3" x:Name="NodeList" DoubleTapped="OnNodeActivated" Margin="0,6,0,0">
-                <ListBox.ItemTemplate>
-                    <DataTemplate x:DataType="local:NodeType">
-                        <TextBlock Text="{Binding Label}"/>   <!-- show each NodeType's Label -->
-                    </DataTemplate>
-                </ListBox.ItemTemplate>
-            </ListBox>
+            <TextBox Grid.Row="3" x:Name="SearchBox" PlaceholderText="Search nodes…" FontSize="12"
+                     Margin="0,6,0,0" TextChanged="OnSearchChanged"/>
+            <!-- collapsible, color-coded category tree; nodes are its leaves. Built in RebuildPalette. -->
+            <TreeView Grid.Row="4" x:Name="PaletteTree" Margin="0,6,0,0"
+                      DoubleTapped="OnNodeActivated" Background="Transparent"/>
         </Grid>
 
-        <GridSplitter Grid.Column="1" Background="#333"/>
+        <GridSplitter Grid.Column="1" Background="{DynamicResource NotaSplitter}"/>
 
         <!-- ============ CENTER: canvas over output table ============ -->
         <Grid Grid.Column="2" RowDefinitions="*,4,220">
-            <Canvas Grid.Row="0" x:Name="NodeCanvas" Background="#1E1E1E" ClipToBounds="True"/>
-            <GridSplitter Grid.Row="1" Background="#333" HorizontalAlignment="Stretch"/>
-            <Border Grid.Row="2" Background="#252526">
+            <Border Grid.Row="0" x:Name="CanvasViewport" Background="{DynamicResource NotaCanvas}" ClipToBounds="True">
+                <Canvas x:Name="NodeCanvas" Background="Transparent" Focusable="True"/>
+            </Border>
+            <GridSplitter Grid.Row="1" Background="{DynamicResource NotaSplitter}" HorizontalAlignment="Stretch"/>
+            <Border Grid.Row="2" Background="{DynamicResource NotaSurface}">
                 <Grid Margin="8" RowDefinitions="Auto,*">
                     <TextBlock Grid.Row="0" Text="Output" FontWeight="Bold"/>
                     <ScrollViewer Grid.Row="1" x:Name="OutputArea" HorizontalScrollBarVisibility="Auto">
-                        <TextBlock Text="(Run the graph, then click a node)" Foreground="#888"/>
+                        <TextBlock Text="(Run the graph, then click a node)" Foreground="{DynamicResource NotaSubtext}"/>
                     </ScrollViewer>
                 </Grid>
             </Border>
         </Grid>
 
-        <GridSplitter Grid.Column="3" Background="#333"/>
+        <GridSplitter Grid.Column="3" Background="{DynamicResource NotaSplitter}"/>
 
         <!-- ============ RIGHT: node info ============ -->
-        <Border Grid.Column="4" Background="#252526">
-            <StackPanel Margin="8" Spacing="4">
-                <TextBlock Text="Node info" FontWeight="Bold"/>
-                <TextBlock x:Name="InfoPanel" Text="(click a node)" Foreground="#888" TextWrapping="Wrap"/>
-            </StackPanel>
+        <Border Grid.Column="4" Background="{DynamicResource NotaSurface}">
+            <Grid Margin="10" RowDefinitions="Auto,*">
+                <TextBlock Grid.Row="0" Text="Node info" FontWeight="Bold" Margin="0,0,0,8"/>
+                <ScrollViewer Grid.Row="1" x:Name="InfoArea">
+                    <TextBlock Text="(click a node)" Foreground="#888"/>
+                </ScrollViewer>
+            </Grid>
         </Border>
 
     </Grid>

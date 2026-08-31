@@ -30,7 +30,7 @@ from nota.core.registry import REGISTRY
 # Bump on any change to the message shapes (see PROTOCOL.md):
 #   minor -> additive/backward-compatible (new optional field or method)
 #   major -> breaking (renamed/removed field, changed meaning)
-PROTOCOL_VERSION = "1.0"
+PROTOCOL_VERSION = "1.3"
 
 
 def _run_capture(graph: Graph) -> tuple[dict, dict]:
