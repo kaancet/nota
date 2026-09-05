@@ -209,7 +209,7 @@ public partial class MainWindow : Window
     private bool _showAll;                               // Edit > Nodes > Show All Nodes (tier=all vs common)
     private readonly List<string> _recent = new();      // recently added kinds, most-recent first
     private readonly HashSet<string> _pinned = new();   // pinned kinds (shown in a top section)
-    private const int RecentMax = 10;
+    private const int RecentMax = 6;
     private Point _lastCanvasWorld;                      // cursor in canvas/world space -> Shift+A placement
     private Popup? _quickAdd;                            // Shift+A quick-add popup
     private string? _qaCategory;                         // quick-add: current category (null = category list)
@@ -2347,6 +2347,31 @@ public partial class MainWindow : Window
         });
         if (files.Count == 0) return;   // cancelled
 
+        try
+        {
+            string json;
+            await using (Stream stream = await files[0].OpenReadAsync())
+            using (var reader = new StreamReader(stream))
+                json = await reader.ReadToEndAsync();
+            LoadGraph(json);
+        }
+        catch (Exception ex) { StatusText.Text = $"load error: {ex.Message}"; }
+    }
+
+    // File > Load Example: open the picker in ~/.nota/examples (created if absent), then load like any .nota
+    private async void OnLoadExample(object? sender, EventArgs e)
+    {
+        TopLevel? top = TopLevel.GetTopLevel(this);
+        if (top is null) return;
+        string dir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nota", "examples");
+        System.IO.Directory.CreateDirectory(dir);
+        IStorageFolder? start = await top.StorageProvider.TryGetFolderFromPathAsync(dir);
+        IReadOnlyList<IStorageFile> files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Load example", AllowMultiple = false, FileTypeFilter = new[] { NotaFile },
+            SuggestedStartLocation = start,
+        });
+        if (files.Count == 0) return;
         try
         {
             string json;

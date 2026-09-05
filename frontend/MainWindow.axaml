@@ -16,6 +16,7 @@
                     <NativeMenu>
                         <NativeMenuItem Header="Save…" Gesture="Cmd+S" Click="OnSave"/>
                         <NativeMenuItem Header="Load…" Gesture="Cmd+O" Click="OnLoad"/>
+                        <NativeMenuItem Header="Load Example…" Click="OnLoadExample"/>
                     </NativeMenu>
                 </NativeMenuItem.Menu>
             </NativeMenuItem>

@@ -18,9 +18,14 @@ Methods:
 
 from __future__ import annotations
 
+import datetime
 import json
+import logging
 import sys
+from pathlib import Path
 from typing import Any
+
+loggr = logging.getLogger("nota")
 
 import nota.nodes  # noqa: F401  -- register builtin nodes before serving
 from nota.core import Graph, create_node, import_function, load_user_nodes, manifest
@@ -51,6 +56,7 @@ def _run_capture(graph: Graph) -> tuple[dict, dict]:
             inbound = {p: [cache[src] for src, _ in refs] for p, refs in n.inputs.items()}
             cache[nid] = spec.invoke(inbound, n.params)
         except Exception as e:  # noqa: BLE001 -- report, don't kill the session
+            loggr.warning("node %s (%s) failed: %s", nid, n.kind, e)
             errors[nid] = {"error": f"{type(e).__name__}: {e}"}
             cache[nid] = None
     return cache, errors
@@ -140,10 +146,25 @@ def handle(request: dict) -> dict:
     try:
         return {"id": rid, "result": fn(request.get("params") or {})}
     except Exception as e:  # noqa: BLE001 -- every error becomes a response, never a crash
+        loggr.exception("method %r failed", request.get("method"))
         return {"id": rid, "error": {"message": f"{type(e).__name__}: {e}"}}
 
 
+def _setup_logging() -> Path:
+    """One log file per session under ~/.nota/logs, named by start time -> errors are traceable."""
+    d = Path.home() / ".nota" / "logs"
+    d.mkdir(parents=True, exist_ok=True)
+    path = d / f"nota-{datetime.datetime.now():%Y%m%d-%H%M%S}.log"
+    logging.basicConfig(
+        filename=str(path), level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+    loggr.info("session start (protocol %s) -> %s", PROTOCOL_VERSION, path)
+    return path
+
+
 def main() -> None:
+    _setup_logging()
     for line in sys.stdin:
         line = line.strip()
         if not line:
@@ -151,6 +172,7 @@ def main() -> None:
         try:
             req = json.loads(line)
         except json.JSONDecodeError as e:
+            loggr.warning("bad json: %s", e)
             resp = {"id": None, "error": {"message": f"bad json: {e}"}}
         else:
             resp = handle(req)
