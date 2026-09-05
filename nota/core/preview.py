@@ -59,17 +59,21 @@ def preview(value: Any, n: int = 50) -> dict:
     return {"type": "scalar", "value": _cell(value), "dtype": type(value).__name__}
 
 
+_MAX_COLS = 100   # cap columns in the payload -> a wide frame can't blow up the wire or the grid
+
+
 def _frame_payload(head_df: pl.DataFrame, n: int, schema: dict, nrows: int | None) -> dict:
     truncated = head_df.height > n
     body = head_df.head(n)
     cols = list(schema.keys())
+    shown = cols[:_MAX_COLS]                         # extra columns hidden; shape[1] keeps the true count
     if nrows is None and not truncated:
         nrows = body.height   # lazy but head fit entirely -> the count is exact, for free
     return {
         "type": "frame",
-        "columns": cols,
-        "schema": {k: str(v) for k, v in schema.items()},
-        "rows": [[_cell(c) for c in row] for row in body.rows()],
-        "shape": [nrows, len(cols)],   # None only when truncated (true total needs a full scan)
+        "columns": shown,
+        "schema": {k: str(v) for k, v in schema.items() if k in set(shown)},
+        "rows": [[_cell(c) for c in row[:_MAX_COLS]] for row in body.rows()],
+        "shape": [nrows, len(cols)],   # full [nrows|None, ncols]; ncols > len(columns) means columns were capped
         "truncated": truncated,
     }

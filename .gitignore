@@ -12,3 +12,7 @@ wheels/
 # C# / .NET build output (frontend)
 [Bb]in/
 [Oo]bj/
+
+# macos
+graphify-out
+.DS_Store

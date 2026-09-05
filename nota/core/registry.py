@@ -1,11 +1,11 @@
-"""Node registry + polars reflection.
+"""Node registry and the polars reflection.
 
-A "node kind" = one callable + a schema describing its ports/params.
-Two population sources, one mechanism:
+A "node kind" is one callable and a schema describing its ports/params.
+Two population sources:
   - reflect_polars(): auto-registers the whole polars API (Expr/DataFrame/... methods + pl.* funcs)
-  - @node: registers a user/custom callable (sources, sinks, plugins)
+  - @node: registers a user/custom callable (sources, sinks, plots, plugins)
 
-The frontend never sees polars; it consumes manifest() (pure JSON) and edits a graph.
+Avalonia consumes manifest() (pure JSON) and edits a graph.
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ class PortSpec:
     type: str
     variadic: bool = False
     optional: bool = False
-    doc: str = ""  # per-port blurb from the docstring's Parameters section
+    doc: str = ""  # per-port doc from the docstring's Parameters section
 
 
 @dataclass
@@ -52,8 +52,8 @@ class ParamSpec:
     type: str
     default: Any
     required: bool
-    doc: str = ""  # per-param blurb from the docstring's Parameters section
-    choices: list | None = None  # enum values (from a Literal annotation) -> a dropdown in the UI
+    doc: str = ""  # per-param doc from the docstring's Parameters section
+    choices: list | None = None  # enum values (from a Literal annotation) becomes a dropdown in the UI
 
 
 @dataclass
@@ -72,7 +72,15 @@ class NodeSpec:
     namespace: str | None = None  # sub-namespace method: call getattr(receiver, namespace).method(...)
 
     def invoke(self, inbound: dict[str, list], params: dict) -> Any:
-        """Reconstruct the call from wired inputs + params, in signature order."""
+        """Reconstruct the call from wired inputs and params, in signature order.
+
+        Args:
+            inbound (dict[str, list]): Inputs dictionary
+            params (dict): Parameter dictionary
+
+        Returns:
+            Any: The invoked function call
+        """
         args: list = []
         kwargs: dict = {}
         receiver = None
@@ -98,14 +106,19 @@ class NodeSpec:
         return self.fn(*args, **kwargs)
 
     def public(self) -> dict:
-        """JSON-safe schema for the frontend manifest."""
+        """JSON-safe schema for the frontend manifest to build the node UI"""
         return {
             "kind": self.kind,
             "category": self.category,
             "inputs": [vars(p) for p in self.inputs],
-            "params": [{k: v for k, v in {**vars(p), "default": _jsonable(p.default)}.items()
-                        if not (k == "choices" and v is None)}  # omit choices unless present
-                       for p in self.params],
+            "params": [
+                {
+                    k: v
+                    for k, v in {**vars(p), "default": _jsonable(p.default)}.items()
+                    if not (k == "choices" and v is None)
+                }  # omit choices unless present
+                for p in self.params
+            ],
             "outputs": [vars(p) for p in self.outputs],
             "doc": self.doc,
             "examples": self.examples,
@@ -113,8 +126,15 @@ class NodeSpec:
         }
 
 
-# ---- annotation classification (polars uses string annotations) ------------
 def _classify(ann: Any) -> str:
+    """Classifies kind/type annotations to plain strings annotation
+
+    Args:
+        ann (Any): annotation
+
+    Returns:
+        str: kind classification name
+    """
     a = str(ann)
     if "Expr" in a:
         return "expr"
@@ -123,11 +143,19 @@ def _classify(ann: Any) -> str:
     if "Series" in a:
         return "series"
     if a in ("<class 'object'>", "object"):
-        return "any"   # an explicit `object` annotation -> a port that accepts anything
+        return "any"  # an explicit `object` annotation -> a port that accepts anything
     return "scalar"
 
 
 def _prim(ann: Any) -> str:
+    """Classifies data type(integer,float,etc) to plain strings from annotation
+
+    Args:
+        ann (Any): annotation
+
+    Returns:
+        str: dta atype classification
+    """
     a = str(ann).lower()
     for t in ("bool", "int", "float", "str"):
         if t in a:
@@ -135,9 +163,12 @@ def _prim(ann: Any) -> str:
     return "any"
 
 
-# namespace to resolve polars' string annotations (it uses `from __future__ import annotations`),
-# so a `mode: RoundMode` alias -> Literal[...] -> its allowed values.
 def _ann_ns() -> dict:
+    """Adds the polars Literals into typing.Literals so they can appear as Enums in some nodes
+
+    Returns:
+        dict: A dictionary containing allowed/existing Literals
+    """
     import typing
 
     ns: dict = {"Literal": typing.Literal}
@@ -145,7 +176,7 @@ def _ann_ns() -> dict:
         import polars._typing as plt  # private, but where the Literal aliases live
 
         ns.update(vars(plt))
-    except Exception:  # noqa: BLE001 - version drift; reflection just won't find choices
+    except Exception:  # noqa: BLE001, S110 - version drift; reflection just won't find choices
         pass
     return ns
 
@@ -154,13 +185,20 @@ _ANN_NS = _ann_ns()
 
 
 def _literal_choices(ann: Any) -> list | None:
-    """The allowed string values if `ann` is (or wraps, e.g. `X | None`) a Literal of strings."""
+    """The allowed string values if `ann` is (or wraps, e.g. `X | None`) a Literal of strings.
+
+    Args:
+        ann (Any): annotation
+
+    Returns:
+        list | None: list of string values allowed
+    """
     import typing
 
     if ann is inspect._empty:
         return None
     try:
-        t = eval(ann, _ANN_NS) if isinstance(ann, str) else ann  # noqa: S307 - trusted polars annotations
+        t = eval(ann, _ANN_NS) if isinstance(ann, str) else ann
     except Exception:  # noqa: BLE001 - unresolvable annotation -> no choices
         return None
     args = None
@@ -175,6 +213,14 @@ def _literal_choices(ann: Any) -> list | None:
 
 
 def _jsonable(v: Any) -> Any:
+    """JSONifies the input
+
+    Args:
+        v (Any): variable to be jsonified
+
+    Returns:
+        Any: jsonified output
+    """
     if isinstance(v, (str, int, float, bool)) or v is None:
         return v
     if isinstance(v, (list, tuple)):
@@ -190,8 +236,15 @@ _DOC_GROUP = {"Expr": "expressions", "LazyFrame": "lazyframe", "DataFrame": "dat
 
 def _doc_url(kind: str) -> str | None:
     """Best-effort polars API page for a reflected member; None for custom nodes.
-    ponytail: only the four main families are mapped (covers every COMMON node);
-    pl.* top-level funcs are omitted rather than guess their scattered subpaths."""
+    Currently only the four main families are mapped (covers every COMMON node).
+    pl.* top-level funcs are omitted rather than guess their scattered subpaths.
+
+    Args:
+        kind (str): node kind as a string
+
+    Returns:
+        str | None: Link to polars API page
+    """
     group = _DOC_GROUP.get(kind.split(".")[0])
     if group is None:
         return None
@@ -274,7 +327,9 @@ def build_spec(fn: Callable, kind: str, category: str, is_method: bool, namespac
         else:
             slots.append(Slot(PARAM_KW, p.name, "scalar", p.kind != p.POSITIONAL_ONLY))
             choices = _literal_choices(p.annotation)
-            pspecs.append(ParamSpec(p.name, "str" if choices else _prim(p.annotation), _default(p), False, choices=choices))
+            pspecs.append(
+                ParamSpec(p.name, "str" if choices else _prim(p.annotation), _default(p), False, choices=choices)
+            )
 
     for p in inputs:
         p.doc = param_docs.get(p.name, "")
@@ -283,8 +338,9 @@ def build_spec(fn: Callable, kind: str, category: str, is_method: bool, namespac
 
     outputs = [PortSpec("out", _classify(sig.return_annotation))]
     doc = (inspect.getdoc(fn) or "").split("\n\n")[0]
-    return NodeSpec(kind, category, is_method, fn, slots, inputs, pspecs, outputs,
-                    doc, examples, _doc_url(kind), namespace)
+    return NodeSpec(
+        kind, category, is_method, fn, slots, inputs, pspecs, outputs, doc, examples, _doc_url(kind), namespace
+    )
 
 
 def _default(p) -> Any:
@@ -371,6 +427,43 @@ def reflect_polars() -> None:
 
     _reflect_namespaces()
     _register_overrides()
+
+
+def import_function(path: str) -> dict:
+    """Load a .py file holding a single top-level function and register it as an 'Imported' node.
+
+    The function's signature is reflected exactly like any builtin (frame/expr/series/object
+    annotations -> ports; primitives -> param widgets; return annotation -> output port). Returns
+    a manifest entry the frontend drops into the palette. Executes the file -> only import files you trust.
+    """
+    import importlib.util
+    from pathlib import Path
+
+    p = Path(path)
+    if not p.exists():
+        raise FileNotFoundError(f"no such file: {path}")
+    spec = importlib.util.spec_from_file_location(f"nota_imported_{p.stem}", str(p))
+    if spec is None or spec.loader is None:
+        raise ValueError(f"cannot load {path}")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)  # runs the file's top level
+
+    fns = [
+        f
+        for name, f in inspect.getmembers(mod, inspect.isfunction)
+        if f.__module__ == mod.__name__ and not name.startswith("_")
+    ]
+    if len(fns) != 1:
+        raise ValueError(f"expected exactly one top-level function in {p.name}, found {len(fns)}")
+
+    fn = fns[0]
+    kind = f"imported.{fn.__name__}"
+    REGISTRY[kind] = build_spec(fn, kind, "Imported", is_method=False)  # raises on an unintrospectable signature
+    entry = REGISTRY[kind].public()
+    entry["category"] = "Imported"
+    entry["label"] = fn.__name__.replace("_", " ")
+    entry["tier"] = "common"
+    return entry
 
 
 def manifest(tier: str = "all") -> list[dict]:

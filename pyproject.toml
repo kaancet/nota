@@ -6,7 +6,9 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "behaviz>=0.6.2",
+    "pingouin>=0.6.1",
     "polars==1.32.3",
+    "pyarrow>=15",       # polars <-> pandas bridge for the pingouin stats nodes
 ]
 
 [project.optional-dependencies]

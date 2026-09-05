@@ -105,6 +105,16 @@ def decorate(entry: dict) -> dict | None:
     kind = entry["kind"]
     if hidden(kind):
         return None
+    if kind.startswith("composite."):        # user-generated macro node: keep public()'s label/category
+        entry.setdefault("category", "User generated")
+        entry.setdefault("label", kind.split(".")[-1].replace("_", " "))
+        entry["tier"] = "common"
+        return entry
+    if kind.startswith("pg."):               # reflected pingouin stats node
+        entry["category"] = "Stats"
+        entry["label"] = kind.split(".")[-1].replace("_", " ")
+        entry["tier"] = "common"
+        return entry
     if kind in COMMON:
         entry["category"], entry["label"] = COMMON[kind]
         entry["tier"] = "common"

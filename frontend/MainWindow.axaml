@@ -19,15 +19,30 @@
                     </NativeMenu>
                 </NativeMenuItem.Menu>
             </NativeMenuItem>
+            <NativeMenuItem Header="Edit">
+                <NativeMenuItem.Menu>
+                    <NativeMenu>
+                        <NativeMenuItem Header="Group into Node…" Gesture="Cmd+G" Click="OnGroupNodes"/>
+                        <NativeMenuItem Header="Import Python Function as Node…" Click="OnImportNode"/>
+                        <NativeMenuItem Header="Nodes">
+                            <NativeMenuItem.Menu>
+                                <NativeMenu>
+                                    <NativeMenuItem Header="Show All Nodes" ToggleType="CheckBox" Click="OnToggleShowAll"/>
+                                </NativeMenu>
+                            </NativeMenuItem.Menu>
+                        </NativeMenuItem>
+                    </NativeMenu>
+                </NativeMenuItem.Menu>
+            </NativeMenuItem>
             <NativeMenuItem Header="View">
                 <NativeMenuItem.Menu>
                     <NativeMenu>
                         <NativeMenuItem Header="Theme">
                             <NativeMenuItem.Menu>
                                 <NativeMenu>
-                                    <NativeMenuItem Header="Dark" Click="OnThemeDark"/>
-                                    <NativeMenuItem Header="Light" Click="OnThemeLight"/>
-                                    <NativeMenuItem Header="System" Click="OnThemeSystem"/>
+                                    <NativeMenuItem Header="Dark" ToggleType="CheckBox" Click="OnThemeDark"/>
+                                    <NativeMenuItem Header="Light" ToggleType="CheckBox" Click="OnThemeLight"/>
+                                    <NativeMenuItem Header="System" ToggleType="CheckBox" Click="OnThemeSystem"/>
                                 </NativeMenu>
                             </NativeMenuItem.Menu>
                         </NativeMenuItem>
@@ -38,7 +53,7 @@
     </NativeMenu.Menu>
 
     <!-- 5 columns: palette | splitter | center | splitter | info -->
-    <Grid ColumnDefinitions="220,4,*,4,280">
+    <Grid ColumnDefinitions="250,4,*,4,280">
 
         <!-- ============ LEFT: palette ============ -->
         <!-- rows: title, status, run, search, list (* = fills the rest) -->
@@ -49,9 +64,10 @@
                     Margin="0,6,0,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
             <TextBox Grid.Row="3" x:Name="SearchBox" PlaceholderText="Search nodes…" FontSize="12"
                      Margin="0,6,0,0" TextChanged="OnSearchChanged"/>
-            <!-- collapsible, color-coded category tree; nodes are its leaves. Built in RebuildPalette. -->
-            <TreeView Grid.Row="4" x:Name="PaletteTree" Margin="0,6,0,0"
-                      DoubleTapped="OnNodeActivated" Background="Transparent"/>
+            <!-- collapsible, color-coded category sections; nodes render as an Nx3 card grid. Built in RebuildPalette. -->
+            <ScrollViewer Grid.Row="4" Margin="0,6,0,0" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel x:Name="PaletteList"/>
+            </ScrollViewer>
         </Grid>
 
         <GridSplitter Grid.Column="1" Background="{DynamicResource NotaSplitter}"/>
@@ -65,14 +81,18 @@
             <Border Grid.Row="2" Background="{DynamicResource NotaSurface}">
                 <Grid Margin="8" RowDefinitions="Auto,*">
                     <TextBlock Grid.Row="0" Text="Output" FontWeight="Bold"/>
-                    <ScrollViewer Grid.Row="1" x:Name="OutputArea" HorizontalScrollBarVisibility="Auto">
+                    <ContentControl Grid.Row="1" x:Name="OutputArea">
                         <TextBlock Text="(Run the graph, then click a node)" Foreground="{DynamicResource NotaSubtext}"/>
-                    </ScrollViewer>
+                    </ContentControl>
                 </Grid>
             </Border>
         </Grid>
 
         <GridSplitter Grid.Column="3" Background="{DynamicResource NotaSplitter}"/>
+
+        <!-- drag ghost overlay: spans the whole window, above everything, never eats input -->
+        <Canvas x:Name="OverlayCanvas" Grid.Column="0" Grid.ColumnSpan="5"
+                ZIndex="1000" IsHitTestVisible="False"/>
 
         <!-- ============ RIGHT: node info ============ -->
         <Border Grid.Column="4" Background="{DynamicResource NotaSurface}">

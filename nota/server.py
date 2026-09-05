@@ -23,14 +23,16 @@ import sys
 from typing import Any
 
 import nota.nodes  # noqa: F401  -- register builtin nodes before serving
-from nota.core import Graph, manifest
+from nota.core import Graph, create_node, import_function, load_user_nodes, manifest
 from nota.core.preview import preview, schema_of
 from nota.core.registry import REGISTRY
+
+load_user_nodes()  # register persisted composite (macro) nodes so they're in the palette
 
 # Bump on any change to the message shapes (see PROTOCOL.md):
 #   minor -> additive/backward-compatible (new optional field or method)
 #   major -> breaking (renamed/removed field, changed meaning)
-PROTOCOL_VERSION = "1.3"
+PROTOCOL_VERSION = "1.5"
 
 
 def _run_capture(graph: Graph) -> tuple[dict, dict]:
@@ -89,6 +91,16 @@ def _schema(params: dict) -> dict:
     return schema_of(cache[node_id])
 
 
+def _import_node(params: dict) -> dict:
+    """Register a user .py function as an 'Imported' node; returns its manifest entry."""
+    return import_function(params["path"])
+
+
+def _create_node(params: dict) -> dict:
+    """Register + persist a composite (macro) node from its definition; returns its manifest entry."""
+    return create_node(params["definition"])
+
+
 def _validate(params: dict) -> dict:
     g = Graph.from_dict(params["graph"])
     issues: list[dict] = []
@@ -114,6 +126,8 @@ HANDLERS = {
     "preview": _preview,
     "schema": _schema,
     "validate": _validate,
+    "import_node": _import_node,
+    "create_node": _create_node,
 }
 
 
