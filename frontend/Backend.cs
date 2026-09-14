@@ -1,67 +1,95 @@
 using System;
 using System.Diagnostics;
+using System.IO;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 
 
 namespace Nota;
 
-// Owns the Python `nota.server` process and talks to it.
-// IDisposable = "I hold a resource that must be released" -> callers invoke Dispose() when done.
 public class Backend : IDisposable
 {
-    // M4 shortcut: hard-coded paths to this machine's venv + repo (we'll make these configurable later)
-    private const string PythonPath = "/Users/kaan/code/nota/.venv/bin/python";
-    private const string RepoPath = "/Users/kaan/code/nota";
-
-    // a FIELD: belongs to the object and lives as long as the object does.
-    // `readonly` = assigned once (in the constructor) and never reassigned afterwards.
     private readonly Process _process;
 
-    // the CONSTRUCTOR: runs when you write `new Backend()`. Launches Python once.
     public Backend()
     {
+        var (python, repo) = Resolve();
         var startInfo = new ProcessStartInfo
         {
-            FileName = PythonPath,
+            FileName = python,
             Arguments = "-m nota.server",
-            WorkingDirectory = RepoPath,
+            WorkingDirectory = repo,
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
             UseShellExecute = false,
         };
-        _process = Process.Start(startInfo)!;   // stored in the field -> stays alive with this object
+        _process = Process.Start(startInfo)
+            ?? throw new InvalidOperationException($"failed to start: {python}");
+    }
+
+    private static (string python, string repo) Resolve()
+    {
+        // 1. env vars override everything
+        string? envPy = Environment.GetEnvironmentVariable("NOTA_PYTHON");
+        string? envRepo = Environment.GetEnvironmentVariable("NOTA_REPO");
+        if (envPy != null && envRepo != null)
+            return (envPy, envRepo);
+
+        // 2. walk up from the exe dir to find pyproject.toml
+        string? repo = envRepo;
+        if (repo == null)
+        {
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+            while (dir != null)
+            {
+                if (File.Exists(Path.Combine(dir.FullName, "pyproject.toml")))
+                {
+                    repo = dir.FullName;
+                    break;
+                }
+                dir = dir.Parent;
+            }
+        }
+        if (repo == null)
+            throw new InvalidOperationException(
+                "cannot find repo (no pyproject.toml above exe dir). Set NOTA_REPO env var.");
+
+        string python = envPy ?? Path.Combine(repo, ".venv",
+            RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "Scripts" : "bin", "python");
+
+        if (!File.Exists(python))
+            throw new InvalidOperationException($"python not found at {python}. Set NOTA_PYTHON env var.");
+
+        return (python, repo);
     }
 
 
     public JsonElement Request(string method, object? parameters = null)
     {
-        // build the JSON request from an object (@params -> the "params" key the server reads)
         string request = JsonSerializer.Serialize(new { id = 1, method, @params = parameters });
 
-        _process.StandardInput.WriteLine(request);   // send one line
+        _process.StandardInput.WriteLine(request);
         _process.StandardInput.Flush();
 
-        string? line = _process.StandardOutput.ReadLine();   // read one line back (blocks until it arrives)
+        string? line = _process.StandardOutput.ReadLine();
         if (line is null)
             throw new InvalidOperationException("backend closed the connection (no response)");
         using var doc = JsonDocument.Parse(line);
-        return doc.RootElement.Clone();   // Clone so it survives after `doc` is disposed at method end
+        return doc.RootElement.Clone();
     }
 
-    // Shut the backend down cleanly. Called when the app closes.
     public void Dispose()
     {
         try
         {
             if (!_process.HasExited)
             {
-                _process.StandardInput.Close();        // EOF -> server's `for line in sys.stdin` loop ends
-                if (!_process.WaitForExit(1000))       // give it up to 1 second to exit on its own
-                    _process.Kill();                   // still alive? force it
+                _process.StandardInput.Close();
+                if (!_process.WaitForExit(1000))
+                    _process.Kill();
             }
         }
-        catch { /* process already gone -- nothing to do */ }
-        _process.Dispose();                            // release the OS handle
+        catch { /* process already gone */ }
+        _process.Dispose();
     }
 }
-

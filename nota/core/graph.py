@@ -139,7 +139,7 @@ class Graph:
             g.add(
                 n["id"],
                 n["kind"],
-                n.get("params", {}),
+                dict(n.get("params") or {}),
                 {p: [tuple(r) for r in refs] for p, refs in n.get("inputs", {}).items()},
             )
         return g

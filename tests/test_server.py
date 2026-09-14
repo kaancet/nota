@@ -58,3 +58,58 @@ def test_unknown_method():
 def test_bad_params_becomes_error_not_crash():
     r = handle({"id": 7, "method": "run_graph", "params": {}})   # missing 'graph'
     assert "error" in r
+
+
+# --- Plan A: serve() isolates stdout ---
+
+def test_serve_noisy_node():
+    """A node that print()s can't corrupt the JSON-lines response."""
+    import io
+    from nota.core.registry import node as reg_node
+
+    @reg_node("test.noisy", "Test")
+    def _noisy() -> int:
+        print("stray output")  # noqa: T201
+        return 42
+
+    g = Graph().add("n", "test.noisy").to_dict()
+    req = json.dumps({"id": 1, "method": "run_graph", "params": {"graph": g}}) + "\n"
+    out = io.StringIO()
+    import sys, nota.server  # noqa: E401
+    saved = sys.stdout
+    sys.stdout = sys.stderr  # mimic main()'s redirect
+    try:
+        nota.server.serve(io.StringIO(req), out)
+    finally:
+        sys.stdout = saved
+    lines = [l for l in out.getvalue().splitlines() if l.strip()]
+    assert len(lines) == 1
+    resp = json.loads(lines[0])
+    assert "result" in resp
+
+
+def test_serve_bad_json():
+    """Malformed JSON line → error envelope, not a crash."""
+    import io
+    from nota.server import serve
+    out = io.StringIO()
+    serve(io.StringIO("not json\n"), out)
+    resp = json.loads(out.getvalue().strip())
+    assert resp["id"] is None
+    assert "bad json" in resp["error"]["message"]
+
+
+# --- Plan B: upstream failure propagation ---
+
+def test_upstream_failure_propagation():
+    """Downstream of a failed node says 'upstream failed', not a misleading NoneType error."""
+    g = (Graph()
+         .add("bad", "source.csv", {"path": "/nonexistent_file_for_test.csv"})
+         .add("h", "LazyFrame.head", inputs={"self": [("bad", "out")]})
+         .add("pv", "sink.preview", inputs={"frame": [("h", "out")]}))
+    r = handle({"id": 10, "method": "run_graph", "params": {"graph": g.to_dict()}})
+    result = r["result"]
+    assert "error" in result["bad"]
+    assert "upstream" in result["h"]["error"]
+    assert "upstream" in result["pv"]["error"]
+    assert "type" not in result["pv"]  # no fake success payload

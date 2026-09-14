@@ -20,6 +20,8 @@ def column(name: str) -> pl.Expr:
 @node("expr.columns", "Column")
 def columns(names: list) -> pl.Expr:
     """Several columns by name (multi-select)."""
+    if isinstance(names, str):
+        names = [s.strip() for s in names.split(",") if s.strip()]
     return pl.col(*names)
 
 

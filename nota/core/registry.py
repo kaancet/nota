@@ -93,12 +93,13 @@ class NodeSpec:
                     args.append(vals[0])
                 elif params.get(s.name) is not None:
                     args.append(params[s.name])
-                # else optional -> omit
+                else:
+                    args.append(None)  # preserve positional order for later ports
             elif s.kind == VARIADIC_PORT:
                 args.extend(inbound.get(s.name, []))
             elif s.kind == PARAM_REQ:  # noqa: SIM114
                 (kwargs.__setitem__(s.name, params[s.name]) if s.by_kw else args.append(params[s.name]))
-            elif s.kind == PARAM_KW and s.name in params:
+            elif s.kind == PARAM_KW and params.get(s.name) is not None:
                 (kwargs.__setitem__(s.name, params[s.name]) if s.by_kw else args.append(params[s.name]))
         if self.is_method:
             target = getattr(receiver, self.namespace) if self.namespace else receiver
@@ -142,6 +143,8 @@ def _classify(ann: Any) -> str:
         return "frame"
     if "Series" in a:
         return "series"
+    if "Figure" in a:
+        return "figure"
     if a in ("<class 'object'>", "object"):
         return "any"  # an explicit `object` annotation -> a port that accepts anything
     return "scalar"
@@ -315,11 +318,12 @@ def build_spec(fn: Callable, kind: str, category: str, is_method: bool, namespac
             inputs.append(PortSpec(p.name, t, variadic=True, optional=True))
         elif p.kind == p.VAR_KEYWORD:
             continue  # ignore **kwargs for the prototype
-        elif _classify(p.annotation) in ("expr", "frame", "series", "any"):
+        elif _classify(p.annotation) in ("expr", "frame", "series", "any", "figure"):
             t = _classify(p.annotation)
+            opt = p.default is not inspect._empty
             slots.append(Slot(PORT_OR_LITERAL, p.name, t))
-            inputs.append(PortSpec(p.name, t, optional=True))
-            pspecs.append(ParamSpec(p.name, "any", _default(p), False))
+            inputs.append(PortSpec(p.name, t, optional=opt))
+            pspecs.append(ParamSpec(p.name, "any", _default(p), not opt))
         elif p.default is inspect._empty:
             slots.append(Slot(PARAM_REQ, p.name, "scalar", p.kind != p.POSITIONAL_ONLY))
             choices = _literal_choices(p.annotation)

@@ -43,7 +43,9 @@ def preview(value: Any, n: int = 50) -> dict:
       scalar -> {type, value, dtype}
     """
     if isinstance(value, dict) and value.get("type") in {"frame", "expr", "scalar", "html"}:
-        return value  # already a payload (e.g. sink.preview / sink.plot output) -> pass through
+        return value  # already a payload (e.g. sink.preview output) -> pass through
+    if isinstance(value, tuple) and len(value) == 2 and _is_bokeh_figure(value[0]):
+        return _figure_to_html(value)
     if isinstance(value, pl.Expr):
         return {"type": "expr", "repr": str(value)}
     if isinstance(value, pl.Series):
@@ -52,9 +54,9 @@ def preview(value: Any, n: int = 50) -> dict:
     if isinstance(value, pl.LazyFrame):
         schema = value.collect_schema()
         head = value.head(n + 1).collect()          # n+1 -> detect "more rows exist"
-        return _frame_payload(head, n, dict(schema), nrows=None)
+        return frame_payload(head, n, dict(schema), nrows=None)
     if isinstance(value, pl.DataFrame):
-        return _frame_payload(value.head(n + 1), n, dict(value.schema), nrows=value.height)
+        return frame_payload(value.head(n + 1), n, dict(value.schema), nrows=value.height)
 
     return {"type": "scalar", "value": _cell(value), "dtype": type(value).__name__}
 
@@ -62,7 +64,7 @@ def preview(value: Any, n: int = 50) -> dict:
 _MAX_COLS = 100   # cap columns in the payload -> a wide frame can't blow up the wire or the grid
 
 
-def _frame_payload(head_df: pl.DataFrame, n: int, schema: dict, nrows: int | None) -> dict:
+def frame_payload(head_df: pl.DataFrame, n: int, schema: dict, nrows: int | None) -> dict:
     truncated = head_df.height > n
     body = head_df.head(n)
     cols = list(schema.keys())
@@ -77,3 +79,13 @@ def _frame_payload(head_df: pl.DataFrame, n: int, schema: dict, nrows: int | Non
         "shape": [nrows, len(cols)],   # full [nrows|None, ncols]; ncols > len(columns) means columns were capped
         "truncated": truncated,
     }
+
+
+def _is_bokeh_figure(obj: Any) -> bool:
+    return type(obj).__module__.startswith("bokeh") and "figure" in type(obj).__name__.lower()
+
+
+def _figure_to_html(fig_ax: tuple) -> dict:
+    from bokeh.embed import file_html
+    from bokeh.resources import INLINE
+    return {"type": "html", "html": file_html(fig_ax[0], INLINE, "plot")}

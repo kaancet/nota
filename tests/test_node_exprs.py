@@ -73,3 +73,9 @@ def test_const_float():
 @covers("expr.const_str")
 def test_const_str():
     assert _const_col("expr.const_str", "hi") == "hi"
+
+
+def test_columns_accepts_comma_string():
+    """H1: expr.columns accepts 'g, v' string from the GUI."""
+    cols = _select("expr.columns", {"names": "g, v"})
+    assert cols == ["g", "v"]

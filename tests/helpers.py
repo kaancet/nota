@@ -15,7 +15,7 @@ from nota.core import REGISTRY, Graph, node, run
 # (module 'polars.*') and user/test nodes (module 'helpers', 'test_*').
 BUILTIN_KINDS = frozenset(
     k for k, s in REGISTRY.items()
-    if getattr(s.fn, "__module__", "").startswith("nota.nodes")
+    if getattr(getattr(s, "fn", None), "__module__", "").startswith("nota.nodes")
 )
 
 

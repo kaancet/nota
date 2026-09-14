@@ -62,3 +62,16 @@ def test_node_decorator_registers_with_schema():
     spec = REGISTRY["x.decotest"]
     params = {p.name for p in spec.params}
     assert params == {"a", "b"} and spec.outputs[0].name == "out"
+
+
+def test_none_kwarg_uses_default():
+    """H3: None for an optional keyword param means 'use default', not pass None."""
+    from nota.core import Graph, run
+    g = (Graph()
+         .add("src", "test.source")
+         .add("col", "expr.column", {"name": "v"})
+         .add("r", "Expr.round", {"decimals": None}, inputs={"self": [("col", "out")]})
+         .add("sel", "LazyFrame.select", inputs={"self": [("src", "out")], "exprs": [("r", "out")]})
+         .add("pv", "sink.preview", inputs={"frame": [("sel", "out")]}))
+    result = run(g)
+    assert result["pv"]["type"] == "frame"

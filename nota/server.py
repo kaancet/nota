@@ -22,6 +22,7 @@ import datetime
 import json
 import logging
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -29,10 +30,12 @@ loggr = logging.getLogger("nota")
 
 import nota.nodes  # noqa: F401  -- register builtin nodes before serving
 from nota.core import Graph, create_node, import_function, load_user_nodes, manifest
-from nota.core.preview import preview, schema_of
+import polars as pl
+
+from nota.core.preview import frame_payload, preview, schema_of
 from nota.core.registry import REGISTRY
 
-load_user_nodes()  # register persisted composite (macro) nodes so they're in the palette
+# load_user_nodes() is called in main() so tests don't read ~/.nota
 
 # Bump on any change to the message shapes (see PROTOCOL.md):
 #   minor -> additive/backward-compatible (new optional field or method)
@@ -47,6 +50,12 @@ def _run_capture(graph: Graph) -> tuple[dict, dict]:
     errors: dict[str, dict] = {}
     for nid in graph.topo():  # raises on cycle -> caller turns it into an error response
         n = graph.nodes[nid]
+        # skip nodes whose upstream already failed
+        failed_srcs = {src for refs in n.inputs.values() for (src, _) in refs if src in errors}
+        if failed_srcs:
+            errors[nid] = {"error": f"upstream node {sorted(failed_srcs)[0]!r} failed"}
+            cache[nid] = None
+            continue
         spec = REGISTRY.get(n.kind)
         if spec is None:
             errors[nid] = {"error": f"unknown kind {n.kind!r}"}
@@ -75,8 +84,26 @@ def _run_graph(params: dict) -> dict:
     g = Graph.from_dict(params["graph"])
     n = params.get("n", 50)
     cache, errors = _run_capture(g)
-    out = {}
+    out: dict = {}
+
+    # Batch all lazy frames into one collect_all for shared sub-plan optimization
+    lazies = [(nid, v) for nid, v in cache.items() if nid not in errors and isinstance(v, pl.LazyFrame)]
+    if lazies:
+        schemas = {nid: dict(v.collect_schema()) for nid, v in lazies}
+        try:
+            heads = pl.collect_all([v.head(n + 1) for _, v in lazies])
+            for (nid, _), head in zip(lazies, heads):
+                out[nid] = frame_payload(head, n, schemas[nid], nrows=None)
+        except Exception:  # noqa: BLE001 -- fallback to per-node preview
+            for nid, v in lazies:
+                try:
+                    out[nid] = preview(v, n)
+                except Exception as e:  # noqa: BLE001
+                    out[nid] = {"error": f"{type(e).__name__}: {e}"}
+
     for nid in g.nodes:
+        if nid in out:
+            continue
         out[nid] = errors[nid] if nid in errors else preview(cache[nid], n)
     return out
 
@@ -150,10 +177,21 @@ def handle(request: dict) -> dict:
         return {"id": rid, "error": {"message": f"{type(e).__name__}: {e}"}}
 
 
+_LOG_KEEP_DAYS = 7
+
+
 def _setup_logging() -> Path:
     """One log file per session under ~/.nota/logs, named by start time -> errors are traceable."""
     d = Path.home() / ".nota" / "logs"
     d.mkdir(parents=True, exist_ok=True)
+    # prune logs older than _LOG_KEEP_DAYS
+    cutoff = time.time() - _LOG_KEEP_DAYS * 86400
+    for f in d.glob("nota-*.log"):
+        try:
+            if f.stat().st_mtime < cutoff:
+                f.unlink()
+        except OSError:
+            pass
     path = d / f"nota-{datetime.datetime.now():%Y%m%d-%H%M%S}.log"
     logging.basicConfig(
         filename=str(path), level=logging.INFO,
@@ -163,9 +201,9 @@ def _setup_logging() -> Path:
     return path
 
 
-def main() -> None:
-    _setup_logging()
-    for line in sys.stdin:
+def serve(inp, out) -> None:
+    """Read JSON-lines from *inp*, write responses to *out*. Testable with StringIO."""
+    for line in inp:
         line = line.strip()
         if not line:
             continue
@@ -176,8 +214,17 @@ def main() -> None:
             resp = {"id": None, "error": {"message": f"bad json: {e}"}}
         else:
             resp = handle(req)
-        sys.stdout.write(json.dumps(resp) + "\n")
-        sys.stdout.flush()
+        out.write(json.dumps(resp) + "\n")
+        out.flush()
+
+
+def main() -> None:
+    _setup_logging()
+    load_user_nodes()
+    # Protect the RPC channel: node code printing to stdout can't corrupt responses.
+    real_out = sys.stdout
+    sys.stdout = sys.stderr
+    serve(sys.stdin, real_out)
 
 
 if __name__ == "__main__":

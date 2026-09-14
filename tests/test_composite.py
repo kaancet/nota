@@ -63,3 +63,12 @@ def test_build_rejects_self_reference_and_cycle(tmp_path):
     ]}, "output_node": "x"}
     with pytest.raises(ValueError):
         create_node(bad_self, tmp_path)
+
+
+def test_from_dict_copies_params(tmp_path):
+    """H2: invoke doesn't mutate the spec's definition via aliased params."""
+    create_node(_DEFN, tmp_path)
+    spec = REGISTRY["composite.top_rows"]
+    orig_n = spec.definition["subgraph"]["nodes"][1]["params"]["n"]
+    run(_outer(2))
+    assert spec.definition["subgraph"]["nodes"][1]["params"]["n"] == orig_n

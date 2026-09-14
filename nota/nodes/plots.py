@@ -1,81 +1,71 @@
-"""Plot sink nodes. These render a frame to an interactive bokeh plot (standalone HTML).
+"""Plot nodes — each takes a frame + channels and returns a (fig, ax) figure tuple.
 
-behaviz builds the figure on its bokeh backend and file_html() call makes the HTML inline.
-Channels (``x``/``y``/…) are column names resolved against the frame.
-``overrides`` is an optional dict input for ANY backend styling kwarg, for now the best use case is to wire a ``dict.build`` node into it.
-Output is a ``{"type": "html"}`` preview payload the frontend renders in a webview.
+Wire the optional ``figure`` input to overlay multiple plots on the same axes.
+``preview()`` converts the tuple to standalone HTML when the frontend requests it.
 """
 
 from __future__ import annotations
 
-import behaviz as bv
+from typing import NewType
+
 import polars as pl
-from bokeh.embed import file_html
-from bokeh.resources import INLINE
 
 from nota.core.registry import node
 
-bv.set_renderer("bokeh")  # plotting is behaviz's only use in the server
+Figure = NewType("Figure", object)
 
-_ROWCAP = 10_000  # plots don't need millions of points -> cap the materialize
+_bv = None
+
+
+def _load_viz():
+    global _bv
+    if _bv is None:
+        import behaviz as bv
+        bv.set_renderer("bokeh")
+        _bv = bv
+
+_ROWCAP = 10_000
 
 
 def _collect(frame: pl.LazyFrame) -> pl.DataFrame:
-    """Helper function to collect LazyFrames
-
-    Args:
-        frame (object): The polars LazyFrame to be collected
-
-    Returns:
-        pl.DataFrame: Collected eager DataFrame
-    """
     if isinstance(frame, pl.LazyFrame):
         return frame.head(_ROWCAP).collect()
     if isinstance(frame, pl.DataFrame):
         return frame.head(_ROWCAP)
-    return frame  # already array-like / dict -> let behaviz resolve it
+    return frame
 
 
-def _render(fn, frame: pl.LazyFrame, overrides: dict, *, title: str, **channels) -> dict:
-    """Run a behaviz plot fn and wrap its figure as an inline-HTML preview payload.
-
-    Args:
-        fn (function): A behaviz plot function, e.g bv.plot_line
-        frame (object): The LazyFrame that will be collected and fed to fn
-        overrides (dict): a dict of backend styling kwargs
-        title (str): Title of the plot
-        channels : Column mapping for plot axes
-
-    Returns:
-        dict: dictionary to be sent to Avalonia frontend
-    """
-    spec = bv.PlotSpec(title=title) if title else None
-    fig, _ax = fn(data=_collect(frame), spec=spec, **channels, **(overrides or {}))
-    return {"type": "html", "html": file_html(fig, INLINE, title or "plot")}
+def _render(plot_name: str, frame: pl.LazyFrame, overrides: dict, figure: object = None, *, title: str, **channels) -> tuple:
+    """Run a behaviz plot fn, return (fig, ax) for downstream overlay."""
+    _load_viz()
+    fn = getattr(_bv, plot_name)
+    spec = _bv.PlotSpec(title=title) if title else None
+    ax = figure[1] if isinstance(figure, tuple) and len(figure) == 2 else None
+    return fn(data=_collect(frame), ax=ax, spec=spec, **channels, **(overrides or {}))
 
 
 @node("sink.plot.line", "Plot")
-def plot_line(frame: pl.LazyFrame, overrides: object = None, *, x: str, y: str, title: str = "") -> dict:
+def plot_line(frame: pl.LazyFrame, overrides: object = None, figure: Figure = None, *, x: str, y: str, title: str = "") -> Figure:
     """Line plot. `x`/`y` are column names; wire a dict into `overrides` for any bokeh styling kwarg."""
-    return _render(bv.plot_line, frame, overrides, x=x, y=y, title=title)
+    return _render("plot_line", frame, overrides, figure, x=x, y=y, title=title)
 
 
 @node("sink.plot.scatter", "Plot")
-def plot_scatter(frame: pl.LazyFrame, overrides: object = None, *, x: str, y: str, title: str = "") -> dict:
+def plot_scatter(frame: pl.LazyFrame, overrides: object = None, figure: Figure = None, *, x: str, y: str, title: str = "") -> Figure:
     """Scatter plot. `x`/`y` are column names; `overrides` forwards any bokeh styling kwarg."""
-    return _render(bv.plot_scatter, frame, overrides, x=x, y=y, title=title)
+    return _render("plot_scatter", frame, overrides, figure, x=x, y=y, title=title)
 
 
 @node("sink.plot.bar", "Plot")
-def plot_bar(frame: pl.LazyFrame, overrides: object = None, *, x: str, y: str, title: str = "") -> dict:
+def plot_bar(frame: pl.LazyFrame, overrides: object = None, figure: Figure = None, *, x: str, y: str, title: str = "") -> Figure:
     """Bar plot. `x`/`y` are column names; `overrides` forwards any bokeh styling kwarg."""
-    return _render(bv.plot_bar, frame, overrides, x=x, y=y, title=title)
+    return _render("plot_bar", frame, overrides, figure, x=x, y=y, title=title)
 
 
 @node("sink.plot.step", "Plot")
-def plot_step(frame: pl.LazyFrame, overrides: object = None, *, x: str, y: str, title: str = "") -> dict:
+def plot_step(frame: pl.LazyFrame, overrides: object = None, figure: Figure = None, *, x: str, y: str, title: str = "") -> Figure:
     """Step plot. `x`/`y` are column names; `overrides` forwards any bokeh styling kwarg."""
-    return _render(bv.plot_step, frame, overrides, x=x, y=y, title=title)
+    return _render("plot_step", frame, overrides, figure, x=x, y=y, title=title)
 
 
 # @node("sink.plot.errorbar", "Plot")

@@ -1,15 +1,16 @@
 """Plot sinks: a frame -> a self-contained interactive HTML payload (bokeh via behaviz)."""
 
-from helpers import covers, preview_of
+from helpers import covers
 
-from nota.core import Graph, manifest
+from nota.core import Graph, manifest, run
+from nota.core.preview import preview
 
 
 def _plot(kind: str) -> dict:
-    """Run test.source -> a plot node and return its HTML payload."""
+    """Run test.source -> a plot node and return its HTML payload via preview."""
     g = Graph().add("src", "test.source").add("pl", kind, {"x": "v", "y": "v", "title": "T"})
     g.connect("src", "pl", "frame")
-    return preview_of(g, "pl")
+    return preview(run(g)["pl"])
 
 
 def _assert_inline_html(out: dict) -> None:
