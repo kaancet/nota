@@ -8,7 +8,7 @@ from nota.core.preview import preview
 
 def _plot(kind: str) -> dict:
     """Run test.source -> a plot node and return its HTML payload via preview."""
-    g = Graph().add("src", "test.source").add("pl", kind, {"x": "v", "y": "v", "title": "T"})
+    g = Graph().add("src", "test.source").add("pl", kind, {"x": "v", "y": "v"})
     g.connect("src", "pl", "frame")
     return preview(run(g)["pl"])
 
@@ -43,7 +43,7 @@ def test_plot_nodes_are_common_and_shaped():
     common = {e["kind"]: e for e in manifest("common")}
     line = common["sink.plot.line"]
     assert line["category"] == "Plot"
-    # x/y/title are param widgets; frame + overrides (the un-hidden kwargs dict) are input ports
-    assert {"x", "y", "title"} <= {p["name"] for p in line["params"]}
+    # x/y/preset are param widgets; frame + overrides (the un-hidden kwargs dict) are input ports
+    assert {"x", "y", "preset"} <= {p["name"] for p in line["params"]}
     assert {"frame", "overrides"} <= {p["name"] for p in line["inputs"]}
     assert next(p for p in line["params"] if p["name"] == "x")["required"] is True

@@ -4,7 +4,7 @@ The contract between the Python backend (`nota.server`) and any frontend (Avalon
 **This file is the source of truth.** The three JSON shapes below are the only coupling
 between the two sides — change one and both sides must agree.
 
-**Version: 1.3** (`nota.server.PROTOCOL_VERSION`)
+**Version: 1.5** (`nota.server.PROTOCOL_VERSION`)
 
 ## Versioning policy
 
@@ -35,6 +35,8 @@ response : {"id": <same>, "result": <json>} | {"id": <same>, "error": {"message"
 | `preview` | `{graph, node_id, n?}` | one **preview payload** |
 | `schema` | `{graph, node_id}` | `{col: dtype_string}` |
 | `validate` | `{graph}` | `{ok: bool, issues: [{node?, issue}]}` |
+| `import_node` | `{path}` | one **node schema** (a user `.py` with a single function, registered as category `Imported`) — **1.4** |
+| `create_node` | `{definition}` | one **node schema** (a composite/macro node: a saved sub-graph registered as category `User generated`, persisted to the user dir) — **1.5** |
 
 ## Shape 1 — node schema (from `get_manifest`)
 
@@ -59,6 +61,30 @@ response : {"id": <same>, "result": <json>} | {"id": <same>, "error": {"message"
   (reflected from a `Literal[...]` annotation) — the frontend renders a dropdown when it's present.
 - **1.3**: an optional `widget` (str) on a param names a special frontend editor instead of a textbox
   (e.g. `"kvlist"` for `dict.build`'s `entries` — a key/value row editor). Additive; omit for a plain widget.
+
+## Shape 1b — composite definition (`create_node` param, **1.5**)
+
+A macro node = a saved sub-graph exposed as one node. `create_node` registers it (category
+`User generated`) and persists it to the user dir (`$NOTA_USER_NODES` or `~/.nota/nodes`), so it
+reloads into the palette every session.
+
+```json
+{
+  "name": "Top rows",
+  "kind": "composite.top_rows",                              // optional; slugged from name if omitted
+  "inputs":  [{"name": "frame", "type": "frame"}],           // exposed wired ports
+  "params":  [{"name": "n", "type": "int", "default": 3}],   // exposed scalars + promoted inner params
+  "outputs": [{"name": "out", "type": "frame"}],
+  "subgraph": { "nodes": [ ... ] },                          // a Shape-2 graph doc (the inner nodes)
+  "input_of": {"frame": "in"},                               // composite input/param name -> inner io.input node id
+  "promoted": [["h", "n", "n", 3]],                          // [inner_node_id, inner_param, composite_param, default]
+  "output_node": "o"                                         // inner node id whose value the composite returns
+}
+```
+- Boundary kinds: `io.input` (0 inputs → its value is injected: a wire if connected, else the param/default)
+  and `io.output` (passthrough — its input is the composite's output). Both live in the registry for the
+  sub-editor to wire; they never appear in the `common` palette.
+- v1 is single-output. Validation rejects a cycle, a missing `output_node`, an unknown inner kind, or self-reference.
 
 ## Shape 2 — graph document (frontend → backend; also the save file)
 

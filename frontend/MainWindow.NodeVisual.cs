@@ -314,7 +314,7 @@ public partial class MainWindow : Window
         field.TextChanged += (_, _) => node.Params[p.Name] = Coerce(field.Text ?? "", p.Type);
 
         // a "path" param gets a Browse… button that opens the OS file picker
-        bool isPath = p.Name == "path";
+        bool isPath = p.Name is "path" or "preset";
         if (isPath) field.MaxWidth = 300;   // a long path scrolls inside the field, doesn't stretch the node
         var row = new Grid { ColumnDefinitions = new ColumnDefinitions(isPath ? "Auto,*,Auto" : "Auto,*") };
         Grid.SetColumn(label, 0);

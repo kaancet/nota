@@ -35,37 +35,37 @@ def _collect(frame: pl.LazyFrame) -> pl.DataFrame:
     return frame
 
 
-def _render(plot_name: str, frame: pl.LazyFrame, overrides: dict, figure: object = None, *, title: str, **channels) -> tuple:
+def _render(plot_name: str, frame: pl.LazyFrame, overrides: dict, figure: object = None, *, preset: str, **channels) -> tuple:
     """Run a behaviz plot fn, return (fig, ax) for downstream overlay."""
     _load_viz()
     fn = getattr(_bv, plot_name)
-    spec = _bv.PlotSpec(title=title) if title else None
+    spec = _bv.load_preset(preset) if preset else None
     ax = figure[1] if isinstance(figure, tuple) and len(figure) == 2 else None
     return fn(data=_collect(frame), ax=ax, spec=spec, **channels, **(overrides or {}))
 
 
 @node("sink.plot.line", "Plot")
-def plot_line(frame: pl.LazyFrame, overrides: object = None, figure: Figure = None, *, x: str, y: str, title: str = "") -> Figure:
+def plot_line(frame: pl.LazyFrame, overrides: object = None, figure: Figure = None, *, x: str, y: str, preset: str = "") -> Figure:
     """Line plot. `x`/`y` are column names; wire a dict into `overrides` for any bokeh styling kwarg."""
-    return _render("plot_line", frame, overrides, figure, x=x, y=y, title=title)
+    return _render("plot_line", frame, overrides, figure, x=x, y=y, preset=preset)
 
 
 @node("sink.plot.scatter", "Plot")
-def plot_scatter(frame: pl.LazyFrame, overrides: object = None, figure: Figure = None, *, x: str, y: str, title: str = "") -> Figure:
+def plot_scatter(frame: pl.LazyFrame, overrides: object = None, figure: Figure = None, *, x: str, y: str, preset: str = "") -> Figure:
     """Scatter plot. `x`/`y` are column names; `overrides` forwards any bokeh styling kwarg."""
-    return _render("plot_scatter", frame, overrides, figure, x=x, y=y, title=title)
+    return _render("plot_scatter", frame, overrides, figure, x=x, y=y, preset=preset)
 
 
 @node("sink.plot.bar", "Plot")
-def plot_bar(frame: pl.LazyFrame, overrides: object = None, figure: Figure = None, *, x: str, y: str, title: str = "") -> Figure:
+def plot_bar(frame: pl.LazyFrame, overrides: object = None, figure: Figure = None, *, x: str, y: str, preset: str = "") -> Figure:
     """Bar plot. `x`/`y` are column names; `overrides` forwards any bokeh styling kwarg."""
-    return _render("plot_bar", frame, overrides, figure, x=x, y=y, title=title)
+    return _render("plot_bar", frame, overrides, figure, x=x, y=y, preset=preset)
 
 
 @node("sink.plot.step", "Plot")
-def plot_step(frame: pl.LazyFrame, overrides: object = None, figure: Figure = None, *, x: str, y: str, title: str = "") -> Figure:
+def plot_step(frame: pl.LazyFrame, overrides: object = None, figure: Figure = None, *, x: str, y: str, preset: str = "") -> Figure:
     """Step plot. `x`/`y` are column names; `overrides` forwards any bokeh styling kwarg."""
-    return _render("plot_step", frame, overrides, figure, x=x, y=y, title=title)
+    return _render("plot_step", frame, overrides, figure, x=x, y=y, preset=preset)
 
 
 # @node("sink.plot.errorbar", "Plot")
