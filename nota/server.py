@@ -33,7 +33,7 @@ from typing import Any
 loggr = logging.getLogger("nota")
 
 import nota.nodes  # noqa: F401  -- register builtin nodes before serving
-from nota.core import Graph, create_node, import_function, load_user_nodes, manifest
+from nota.core import Graph, create_node, import_function, load_user_imports, load_user_nodes, manifest
 import polars as pl
 
 from nota.core.preview import frame_payload, preview, schema_of
@@ -304,6 +304,7 @@ def serve(inp, out) -> None:
 
 def main() -> None:
     _setup_logging()
+    load_user_imports()  # before load_user_nodes: a composite may contain an imported node
     load_user_nodes()
     # Protect the RPC channel: node code printing to stdout can't corrupt responses.
     real_out = sys.stdout

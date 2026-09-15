@@ -68,5 +68,26 @@ def plot_step(frame: pl.LazyFrame, overrides: object = None, figure: Figure = No
     return _render("plot_step", frame, overrides, figure, x=x, y=y, preset=preset)
 
 
+@node("sink.plot.hbar", "Plot")
+def plot_hbar(frame: pl.LazyFrame, overrides: object = None, figure: Figure = None, *, y: str, x: str, preset: str = "") -> Figure:
+    """Horizontal bar plot. `y` is the category column, `x` the value column; `overrides` forwards any bokeh styling kwarg."""
+    return _render("plot_hbar", frame, overrides, figure, y=y, x=x, preset=preset)
+
+
+@node("sink.plot.hist", "Plot")
+def plot_hist(frame: pl.LazyFrame, figure: Figure = None, *, values: str, bin_width: float = 1.0, density: bool = False) -> Figure:
+    """Histogram of one numeric column. `values` is the column name; `bin_width` sets the bucket size.
+
+    behaviz's plot_hist1d is array-based (not column/`data=` like the other plots), so this node
+    collects the column itself rather than going through `_render`.
+    """
+    _load_viz()
+    df = _collect(frame)
+    ax = figure[1] if isinstance(figure, tuple) and len(figure) == 2 else None
+    return _bv.plot_hist1d(values=[df[values].to_numpy()], bin_width=bin_width, density=density, ax=ax)
+
+
+# ponytail: no sink.plot.box -- behaviz plot_boxplot wants a numeric `x` axis position, not a
+# category column, so it doesn't fit the "channel = column name" model the other plots use.
 # @node("sink.plot.errorbar", "Plot")
 # def plot_errorbar(frame: pl.LazyFrame, overrides:object =None, *, x:str, y:str, title:str="") -> dict:

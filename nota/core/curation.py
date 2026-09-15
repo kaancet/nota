@@ -82,6 +82,10 @@ COMMON: dict[str, tuple[str, str]] = {
     # Plot (interactive bokeh via behaviz)
     "sink.plot.line": ("Plot", "Line plot"), "sink.plot.scatter": ("Plot", "Scatter plot"),
     "sink.plot.bar": ("Plot", "Bar plot"), "sink.plot.step": ("Plot", "Step plot"),
+    "sink.plot.hist": ("Plot", "Histogram"), "sink.plot.hbar": ("Plot", "Horizontal bar"),
+    # Code (write the expression instead of wiring it)
+    "expr.sql": ("Expression", "SQL expression"), "transform.sql": ("Transform", "SQL query"),
+    "transform.python": ("Transform", "Python"),
     # Dict
     "dict.build": ("Dict", "Dict builder"),
 }
@@ -91,6 +95,9 @@ COMMON: dict[str, tuple[str, str]] = {
 # plain textbox. Injected onto the manifest entry; the frontend renders accordingly.
 WIDGETS: dict[str, dict[str, str]] = {
     "dict.build": {"entries": "kvlist"},  # a dynamic key/value row editor
+    "transform.sql": {"query": "code"},   # multiline code editor
+    "transform.python": {"code": "code"},
+    "expr.sql": {"expression": "code"},
 }
 
 

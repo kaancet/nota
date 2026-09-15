@@ -39,6 +39,18 @@ def test_plot_step():
     _assert_inline_html(_plot("sink.plot.step"))
 
 
+@covers("sink.plot.hbar")
+def test_plot_hbar():
+    _assert_inline_html(_plot("sink.plot.hbar"))
+
+
+@covers("sink.plot.hist")
+def test_plot_hist():
+    g = Graph().add("src", "test.source").add("pl", "sink.plot.hist", {"values": "v"})
+    g.connect("src", "pl", "frame")
+    _assert_inline_html(preview(run(g)["pl"]))
+
+
 def test_plot_nodes_are_common_and_shaped():
     common = {e["kind"]: e for e in manifest("common")}
     line = common["sink.plot.line"]

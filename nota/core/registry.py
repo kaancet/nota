@@ -467,7 +467,49 @@ def import_function(path: str) -> dict:
     entry["category"] = "Imported"
     entry["label"] = fn.__name__.replace("_", " ")
     entry["tier"] = "common"
+    _record_import(str(p.resolve()))  # persist -> re-import at startup, like composites
     return entry
+
+
+def _imports_file():
+    from pathlib import Path
+    from nota.core.composite import user_nodes_dir  # lazy: composite imports registry
+    return user_nodes_dir() / "imports.json"
+
+
+def _record_import(path: str) -> None:
+    """Append an imported file's absolute path to imports.json (deduped)."""
+    import json
+    f = _imports_file()
+    f.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        paths = json.loads(f.read_text(encoding="utf-8")) if f.exists() else []
+    except (OSError, ValueError):
+        paths = []
+    if path not in paths:
+        paths.append(path)
+        f.write_text(json.dumps(paths, indent=2), encoding="utf-8")
+
+
+def load_user_imports() -> list[str]:
+    """Re-import every persisted file. Called at startup before load_user_nodes (a composite
+    may use an imported node). A moved/deleted file is skipped, never fatal."""
+    import json
+    f = _imports_file()
+    if not f.exists():
+        return []
+    try:
+        paths = json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    loaded = []
+    for p in paths:
+        try:
+            import_function(p)
+            loaded.append(p)
+        except Exception as e:  # noqa: BLE001 -- a bad path must not sink startup
+            loggr.warning("skip user import %s: %s", p, e)
+    return loaded
 
 
 def manifest(tier: str = "all") -> list[dict]:
