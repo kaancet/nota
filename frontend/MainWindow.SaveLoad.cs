@@ -32,7 +32,7 @@ public partial class MainWindow : Window
     private sealed record SavedNode(string id, string kind, double x, double y,
                                     Dictionary<string, object?> @params, bool collapsed = false);
     private sealed record SavedEdge(string sourceId, string sourceOut, string targetId, string targetIn);
-    private sealed record SavedBox(double x, double y, double w, double h, string name, int colorIdx);
+    private sealed record SavedBox(double x, double y, double w, double h, string name, int colorIdx, string type = "group");
     // boxes is optional (added later) -> pre-box .nota files deserialize it to null
     private sealed record SavedGraph(int version, List<SavedNode> nodes, List<SavedEdge> edges,
                                      List<SavedBox>? boxes = null);
@@ -56,10 +56,16 @@ public partial class MainWindow : Window
         var doc = new SavedGraph(1,
             _nodes.Select(n => new SavedNode(n.Id, n.Type.Kind, n.X, n.Y, n.Params, n.Collapsed)).ToList(),
             _edges.Select(ed => new SavedEdge(ed.SourceId, ed.SourceOut, ed.TargetId, ed.TargetIn)).ToList(),
-            NodeCanvas.Children.OfType<Border>().Where(b => b.Tag is GroupBox)
-                .Select(b => { var gb = (GroupBox)b.Tag!;
-                               return new SavedBox(Canvas.GetLeft(b), Canvas.GetTop(b), b.Width, b.Height,
-                                                   gb.Name.Text ?? "", gb.ColorIdx); }).ToList());
+            NodeCanvas.Children.OfType<Border>().Where(b => b.Tag is GroupBox or TextNote)
+                .Select(b =>
+                {
+                    if (b.Tag is TextNote tn)
+                        return new SavedBox(Canvas.GetLeft(b), Canvas.GetTop(b), b.Width, b.Height,
+                                           tn.Text.Text ?? "", 0, "text");
+                    var gb = (GroupBox)b.Tag!;
+                    return new SavedBox(Canvas.GetLeft(b), Canvas.GetTop(b), b.Width, b.Height,
+                                       gb.Name.Text ?? "", gb.ColorIdx);
+                }).ToList());
         try
         {
             await using Stream stream = await file.OpenWriteAsync();
@@ -176,8 +182,13 @@ public partial class MainWindow : Window
         }
         foreach (SavedBox sb in doc.boxes ?? Enumerable.Empty<SavedBox>())
         {
-            AddBox(sb.x, sb.y, sb.w, sb.h, sb.name, sb.colorIdx);
-            _boxColorIdx = Math.Max(_boxColorIdx, sb.colorIdx + 1);
+            if (sb.type == "text")
+                AddTextNote(sb.x, sb.y, sb.w, sb.h, sb.name);
+            else
+            {
+                AddBox(sb.x, sb.y, sb.w, sb.h, sb.name, sb.colorIdx);
+                _boxColorIdx = Math.Max(_boxColorIdx, sb.colorIdx + 1);
+            }
         }
         StatusText.Text = skipped == 0
             ? $"loaded · {_nodes.Count} nodes"

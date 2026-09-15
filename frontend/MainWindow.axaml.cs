@@ -76,6 +76,7 @@ public partial class MainWindow : Window
     // group boxes: right-drag on the canvas draws a colored region (behind nodes/wires) for
     // organizing big graphs. Purely visual -> selectable/movable/deletable, never affects nodes.
     private sealed class GroupBox { public int ColorIdx; public TextBox Name = null!; public Button Swatch = null!; }
+    private sealed class TextNote { public TextBox Text = null!; }
     private static readonly Color[] _boxColors =
     {
         Color.FromRgb(0x42, 0x85, 0xF4), Color.FromRgb(0x0F, 0x9D, 0x58),

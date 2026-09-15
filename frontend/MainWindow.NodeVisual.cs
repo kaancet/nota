@@ -695,7 +695,7 @@ public partial class MainWindow : Window
             ("any",    "#90A4AE", "Any / Unknown"),
         };
 
-        var grid = new Grid { Margin = new Thickness(16), RowDefinitions = new RowDefinitions(), ColumnDefinitions = new ColumnDefinitions("Auto,Auto,Auto,*") };
+        var grid = new Grid { Margin = new Thickness(16), RowDefinitions = new RowDefinitions(), ColumnDefinitions = new ColumnDefinitions("Auto,*") };
         int row = 0;
         // header: shapes
         var shapeNote = new TextBlock
@@ -704,7 +704,7 @@ public partial class MainWindow : Window
             Foreground = ThemeSubtext, Margin = new Thickness(0, 0, 0, 12),
         };
         grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-        Grid.SetRow(shapeNote, row); Grid.SetColumnSpan(shapeNote, 4);
+        Grid.SetRow(shapeNote, row); Grid.SetColumnSpan(shapeNote, 2);
         grid.Children.Add(shapeNote);
         row++;
 
@@ -712,20 +712,18 @@ public partial class MainWindow : Window
         {
             grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
 
-            var circle = new Ellipse { Width = 12, Height = 12, Fill = Brush(color), Margin = new Thickness(0, 3, 8, 3), VerticalAlignment = VerticalAlignment.Center };
-            Grid.SetRow(circle, row); Grid.SetColumn(circle, 0);
-            grid.Children.Add(circle);
-
-            var square = new Rectangle { Width = 12, Height = 12, Fill = Brush(color), Margin = new Thickness(0, 3, 12, 3), VerticalAlignment = VerticalAlignment.Center };
-            Grid.SetRow(square, row); Grid.SetColumn(square, 1);
-            grid.Children.Add(square);
-
-            var typeTb = new TextBlock { Text = type, FontWeight = FontWeight.Bold, FontSize = 13, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 2, 12, 2) };
-            Grid.SetRow(typeTb, row); Grid.SetColumn(typeTb, 2);
-            grid.Children.Add(typeTb);
+            var chip = new Border
+            {
+                Background = Brush(color), CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(10, 3), Margin = new Thickness(0, 3, 12, 3),
+                VerticalAlignment = VerticalAlignment.Center,
+                Child = new TextBlock { Text = type, FontSize = 12, FontWeight = FontWeight.Bold, Foreground = Brushes.White },
+            };
+            Grid.SetRow(chip, row); Grid.SetColumn(chip, 0);
+            grid.Children.Add(chip);
 
             var labelTb = new TextBlock { Text = label, FontSize = 13, VerticalAlignment = VerticalAlignment.Center, Foreground = ThemeSubtext, Margin = new Thickness(0, 2) };
-            Grid.SetRow(labelTb, row); Grid.SetColumn(labelTb, 3);
+            Grid.SetRow(labelTb, row); Grid.SetColumn(labelTb, 1);
             grid.Children.Add(labelTb);
 
             row++;

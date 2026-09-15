@@ -37,7 +37,11 @@ public partial class MainWindow : Window
     {
         foreach (Border b in _selNodes) b.BorderBrush = Brushes.SteelBlue;
         foreach (Wire w in _selWires) w.Path.Stroke = WireColor(w);
-        foreach (Border bx in _selBoxes) bx.BorderThickness = new Thickness(1.5);
+        foreach (Border bx in _selBoxes)
+        {
+            if (bx.Tag is TextNote) { bx.BorderThickness = new Thickness(0); bx.BorderBrush = Brushes.Transparent; }
+            else bx.BorderThickness = new Thickness(1.5);
+        }
         _selNodes.Clear();
         _selWires.Clear();
         _selBoxes.Clear();
@@ -246,7 +250,7 @@ public partial class MainWindow : Window
             e.Pointer.Capture(null);
             if (_drawingBox.Width < 20 || _drawingBox.Height < 20)   // ignore an accidental click/tiny drag
                 NodeCanvas.Children.Remove(_drawingBox);
-            else { FinalizeBox(_drawingBox, _boxColorIdx); _boxColorIdx++; }
+            else ShowBoxMenu(_drawingBox, _boxColorIdx);
             _drawingBox = null;
             return;
         }
@@ -265,6 +269,46 @@ public partial class MainWindow : Window
             SyncPanels();
         }
         e.Pointer.Capture(null);
+    }
+
+    // right-drag released a valid rectangle -> let the user choose group or text note
+    private void ShowBoxMenu(Border box, int colorIdx)
+    {
+        var groupBtn = new Border
+        {
+            Padding = new Thickness(8, 4), Cursor = new Cursor(StandardCursorType.Hand),
+            Background = Brushes.Transparent,
+            Child = new TextBlock { Text = "Group Region", Foreground = ThemeText, FontSize = 13 },
+        };
+        var textBtn = new Border
+        {
+            Padding = new Thickness(8, 4), Cursor = new Cursor(StandardCursorType.Hand),
+            Background = Brushes.Transparent,
+            Child = new TextBlock { Text = "Text Note", Foreground = ThemeText, FontSize = 13 },
+        };
+
+        var popup = new Popup
+        {
+            PlacementTarget = NodeCanvas, Placement = PlacementMode.Pointer, IsLightDismissEnabled = true,
+            Child = new Border
+            {
+                Background = ThemeNodeBg, BorderBrush = ThemeAccent, BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(6), Padding = new Thickness(2),
+                Child = new StackPanel { Children = { groupBtn, textBtn } },
+            },
+        };
+
+        groupBtn.PointerPressed += (_, _) => { FinalizeBox(box, colorIdx); _boxColorIdx++; popup.IsOpen = false; };
+        textBtn.PointerPressed += (_, _) => { FinalizeTextNote(box); popup.IsOpen = false; };
+        popup.Closed += (_, _) =>
+        {
+            NodeCanvas.Children.Remove(popup);
+            if (box.Tag is not GroupBox and not TextNote)
+                NodeCanvas.Children.Remove(box);
+        };
+
+        NodeCanvas.Children.Add(popup);
+        popup.Open();
     }
 
     // turn the just-drawn rectangle into a real group box with a watermark title + small color swatch
@@ -331,6 +375,48 @@ public partial class MainWindow : Window
         return box;
     }
 
+    private void FinalizeTextNote(Border box)
+    {
+        box.Background = Brushes.Transparent;
+        box.BorderBrush = Brushes.Transparent;
+        box.BorderThickness = new Thickness(0);
+
+        var tn = new TextNote();
+        box.Tag = tn;
+
+        tn.Text = new TextBox
+        {
+            PlaceholderText = "note", Background = Brushes.Transparent, BorderThickness = new Thickness(0),
+            Foreground = ThemeText, FontSize = 15, TextWrapping = TextWrapping.Wrap, AcceptsReturn = true,
+            VerticalAlignment = VerticalAlignment.Stretch, HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalContentAlignment = VerticalAlignment.Top,
+            IsHitTestVisible = true,
+        };
+        tn.Text.LostFocus += (_, _) => tn.Text.IsHitTestVisible = false;
+
+        var grid = new Grid { Background = Brushes.Transparent };
+        grid.Children.Add(tn.Text);
+        box.Child = grid;
+        box.PointerPressed += OnBoxPressed;
+    }
+
+    private Border AddTextNote(double x, double y, double w, double h, string text)
+    {
+        var box = new Border
+        {
+            Background = Brushes.Transparent, BorderBrush = Brushes.Transparent,
+            BorderThickness = new Thickness(0), ZIndex = -1, Width = w, Height = h,
+        };
+        Canvas.SetLeft(box, x);
+        Canvas.SetTop(box, y);
+        NodeCanvas.Children.Add(box);
+        FinalizeTextNote(box);
+        var tn = (TextNote)box.Tag!;
+        tn.Text.Text = text;
+        tn.Text.IsHitTestVisible = false;
+        return box;
+    }
+
     private void SetBoxColor(Border box, int idx)
     {
         if (box.Tag is not GroupBox gb) return;
@@ -344,8 +430,17 @@ public partial class MainWindow : Window
     private void SelectBox(Border box, bool additive)
     {
         if (!additive) ClearSelection();
-        if (additive && _selBoxes.Remove(box)) box.BorderThickness = new Thickness(1.5);
-        else { _selBoxes.Add(box); box.BorderThickness = new Thickness(3); }
+        if (additive && _selBoxes.Remove(box))
+        {
+            if (box.Tag is TextNote) { box.BorderThickness = new Thickness(0); box.BorderBrush = Brushes.Transparent; }
+            else box.BorderThickness = new Thickness(1.5);
+        }
+        else
+        {
+            _selBoxes.Add(box);
+            if (box.Tag is TextNote) { box.BorderThickness = new Thickness(1); box.BorderBrush = ThemeAccent; }
+            else box.BorderThickness = new Thickness(3);
+        }
         SyncPanels();
     }
 
@@ -358,6 +453,13 @@ public partial class MainWindow : Window
         {
             gb2.Name.IsHitTestVisible = true;
             gb2.Name.Focus();
+            e.Handled = true;
+            return;
+        }
+        if (e.ClickCount == 2 && box.Tag is TextNote tn2)
+        {
+            tn2.Text.IsHitTestVisible = true;
+            tn2.Text.Focus();
             e.Handled = true;
             return;
         }
