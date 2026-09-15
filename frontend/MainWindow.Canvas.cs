@@ -28,6 +28,10 @@ public partial class MainWindow : Window
 {
     // --- selection + deletion ---
 
+    // outward highlight ring for a selected node (Spread outward, Blur 0 -> crisp; no layout reflow)
+    private static readonly BoxShadows SelGlow =
+        new(new BoxShadow { OffsetX = 0, OffsetY = 0, Blur = 0, Spread = 2.5, Color = Color.Parse("#00b3a7") });
+
     private static NodeInstance DotNode(Shape dot) => ((PortRef)dot.Tag!).Node;
     private static bool SamePort(PortRef a, PortRef b) => ReferenceEquals(a.Node, b.Node) && a.Port.Name == b.Port.Name;
     private static IBrush WireColor(Wire w) => TypeColor(((PortRef)w.From.Tag!).Port.Type);
@@ -35,7 +39,7 @@ public partial class MainWindow : Window
     // clear every selected node/wire back to its normal look
     private void ClearSelection()
     {
-        foreach (Border b in _selNodes) b.BorderBrush = Brushes.SteelBlue;
+        foreach (Border b in _selNodes) { b.BorderBrush = Brushes.CadetBlue; b.BoxShadow = default; }
         foreach (Wire w in _selWires) w.Path.Stroke = WireColor(w);
         foreach (Border bx in _selBoxes)
         {
@@ -51,8 +55,8 @@ public partial class MainWindow : Window
     private void SelectNode(Border box, bool additive)
     {
         if (!additive) ClearSelection();
-        if (additive && _selNodes.Remove(box)) box.BorderBrush = Brushes.SteelBlue;   // toggle off
-        else { _selNodes.Add(box); box.BorderBrush = ThemeAccent; }
+        if (additive && _selNodes.Remove(box)) { box.BorderBrush = Brushes.SteelBlue; box.BoxShadow = default; }   // toggle off
+        else { _selNodes.Add(box); box.BorderBrush = ThemeAccent; box.BoxShadow = SelGlow; }
         SyncPanels();
     }
 
@@ -248,7 +252,7 @@ public partial class MainWindow : Window
         if (_drawingBox is not null)   // finish drawing a group box
         {
             e.Pointer.Capture(null);
-            if (_drawingBox.Width < 20 || _drawingBox.Height < 20)   // ignore an accidental click/tiny drag
+            if (!(_drawingBox.Width >= 20 && _drawingBox.Height >= 20))   // ignore accidental click / tiny drag (NaN when no move)
                 NodeCanvas.Children.Remove(_drawingBox);
             else ShowBoxMenu(_drawingBox, _boxColorIdx);
             _drawingBox = null;
@@ -265,7 +269,7 @@ public partial class MainWindow : Window
             foreach (Border b in NodeCanvas.Children.OfType<Border>())
                 if (b.Tag is NodeInstance n && r.Intersects(new Rect(n.X, n.Y, b.Bounds.Width, b.Bounds.Height))
                     && _selNodes.Add(b))
-                    b.BorderBrush = ThemeAccent;
+                    { b.BorderBrush = ThemeAccent; b.BoxShadow = SelGlow; }
             SyncPanels();
         }
         e.Pointer.Capture(null);
