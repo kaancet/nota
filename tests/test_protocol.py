@@ -26,7 +26,16 @@ def _has(required: set, actual) -> bool:
 def test_protocol_version_handshake():
     r = handle({"id": 1, "method": "server_info"})
     assert r["result"]["protocol_version"] == PROTOCOL_VERSION
-    assert "run_graph" in r["result"]["methods"]
+    methods = set(r["result"]["methods"])
+    assert {"run_graph", "columns", "import_node", "create_node"} <= methods
+
+
+def test_protocol_md_version_matches():
+    import re
+    from pathlib import Path
+    text = (Path(__file__).parents[1] / "PROTOCOL.md").read_text(encoding="utf-8")
+    m = re.search(r"\*\*Version: (\d+\.\d+)\*\*", text)
+    assert m and m.group(1) == PROTOCOL_VERSION      # doc/code drift is a red test
 
 
 def test_response_envelope_shape():
@@ -67,3 +76,4 @@ def test_run_graph_result_shape():
     g.connect("src", "pv", "frame")
     r = handle({"id": 2, "method": "run_graph", "params": {"graph": g.to_dict()}})
     assert _has(FRAME_KEYS, r["result"]["pv"])
+    assert "ms" in r["result"]["pv"]                 # per-node timing on every payload (1.6)

@@ -13,16 +13,20 @@ Methods:
   run_graph    {graph, n?}              -> {node_id: preview payload | {error}}
   preview      {graph, node_id, n?}     -> one node's preview payload
   schema       {graph, node_id}         -> {col: dtype}  (no full run)
+  columns      {graph, node_id}         -> [str]  column names relevant to that node
   validate     {graph}                  -> {ok, issues}  (cycles / missing ports / bad kinds)
 """
 
 from __future__ import annotations
 
+import contextlib
 import datetime
+import io
 import json
 import logging
 import sys
 import time
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -40,14 +44,29 @@ from nota.core.registry import REGISTRY
 # Bump on any change to the message shapes (see PROTOCOL.md):
 #   minor -> additive/backward-compatible (new optional field or method)
 #   major -> breaking (renamed/removed field, changed meaning)
-PROTOCOL_VERSION = "1.5"
+PROTOCOL_VERSION = "1.6"
 
 
-def _run_capture(graph: Graph) -> tuple[dict, dict]:
+def _missing_input(spec, n) -> Any:
+    """The first required input port that is neither wired nor satisfiable by a literal
+    param, else None. Catches an unwired `self` (a cryptic KeyError deep in invoke) while
+    leaving port-or-literal args (which carry a same-named param fallback) alone."""
+    pnames = {p.name for p in spec.params}
+    return next(
+        (p for p in spec.inputs
+         if not p.optional and not p.variadic and p.name not in pnames and not n.inputs.get(p.name)),
+        None,
+    )
+
+
+def _run_capture(graph: Graph) -> tuple[dict, dict, dict]:
     """Evaluate the graph, capturing per-node errors instead of aborting the whole run.
-    Returns (cache, errors) keyed by node id; a failed node caches None."""
+    Returns (cache, errors, meta) keyed by node id; a failed node caches None.
+    meta[nid] = {"ms": float, "log": str?}: the node's own compute time, plus its captured
+    stdout + warnings (only when non-empty)."""
     cache: dict[str, Any] = {}
     errors: dict[str, dict] = {}
+    meta: dict[str, dict] = {}
     for nid in graph.topo():  # raises on cycle -> caller turns it into an error response
         n = graph.nodes[nid]
         # skip nodes whose upstream already failed
@@ -61,14 +80,24 @@ def _run_capture(graph: Graph) -> tuple[dict, dict]:
             errors[nid] = {"error": f"unknown kind {n.kind!r}"}
             cache[nid] = None
             continue
-        try:
-            inbound = {p: [cache[src] for src, _ in refs] for p, refs in n.inputs.items()}
-            cache[nid] = spec.invoke(inbound, n.params)
-        except Exception as e:  # noqa: BLE001 -- report, don't kill the session
-            loggr.warning("node %s (%s) failed: %s", nid, n.kind, e)
-            errors[nid] = {"error": f"{type(e).__name__}: {e}"}
+        miss = _missing_input(spec, n)
+        if miss is not None:
+            errors[nid] = {"error": f"missing required input {miss.name!r} ({miss.type})"}
             cache[nid] = None
-    return cache, errors
+            continue
+        inbound = {p: [cache[src] for src, _ in refs] for p, refs in n.inputs.items()}
+        buf, t0 = io.StringIO(), time.perf_counter()
+        with contextlib.redirect_stdout(buf), warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            try:
+                cache[nid] = spec.invoke(inbound, n.params)
+            except Exception as e:  # noqa: BLE001 -- report, don't kill the session
+                loggr.warning("node %s (%s) failed: %s", nid, n.kind, e)
+                errors[nid] = {"error": f"{type(e).__name__}: {e}"}
+                cache[nid] = None
+        log = buf.getvalue() + "".join(f"warning: {x.message}\n" for x in w)
+        meta[nid] = {"ms": round((time.perf_counter() - t0) * 1000, 1), **({"log": log} if log else {})}
+    return cache, errors, meta
 
 
 def _server_info(params: dict) -> dict:
@@ -83,7 +112,7 @@ def _get_manifest(params: dict) -> list[dict]:
 def _run_graph(params: dict) -> dict:
     g = Graph.from_dict(params["graph"])
     n = params.get("n", 50)
-    cache, errors = _run_capture(g)
+    cache, errors, meta = _run_capture(g)
     out: dict = {}
 
     # Batch all lazy frames into one collect_all for shared sub-plan optimization
@@ -105,23 +134,77 @@ def _run_graph(params: dict) -> dict:
         if nid in out:
             continue
         out[nid] = errors[nid] if nid in errors else preview(cache[nid], n)
+    for nid in g.nodes:  # per-node timing/log rides along on every payload (error payloads too)
+        out[nid] = {**out[nid], **meta.get(nid, {})}
     return out
 
 
 def _preview(params: dict) -> dict:
-    g = Graph.from_dict(params["graph"])
     node_id = params["node_id"]
-    cache, errors = _run_capture(g)
-    return errors.get(node_id) or preview(cache[node_id], params.get("n", 50))
+    g = Graph.from_dict(params["graph"]).upto(node_id)  # run only what feeds this node
+    cache, errors, meta = _run_capture(g)
+    payload = errors.get(node_id) or preview(cache[node_id], params.get("n", 50))
+    return {**payload, **meta.get(node_id, {})}
 
 
 def _schema(params: dict) -> dict:
-    g = Graph.from_dict(params["graph"])
     node_id = params["node_id"]
-    cache, errors = _run_capture(g)
+    g = Graph.from_dict(params["graph"]).upto(node_id)
+    cache, errors, _ = _run_capture(g)
     if node_id in errors:
         return errors[node_id]
     return schema_of(cache[node_id])
+
+
+def _frame_sources(g: Graph, nid: str) -> list[str]:
+    """Source node id(s) whose columns `nid` could refer to: the frame it feeds.
+
+    An expr node (e.g. expr.column) has no frame input, so walk downstream to the first
+    node with a wired frame port and take that port's source. Fall back to every source
+    frame in the graph when nothing downstream consumes a frame yet.
+    """
+    def wired_frame_srcs(x: str) -> list[str]:
+        n = g.nodes[x]
+        spec = REGISTRY.get(n.kind)
+        if spec is None:
+            return []
+        return [src for p in spec.inputs if p.type == "frame" for src, _ in n.inputs.get(p.name, [])]
+
+    hit = wired_frame_srcs(nid)
+    if hit:
+        return hit
+    # ponytail: BFS to the first frame consumer; ambiguity (two frames) -> union. Good enough until someone complains.
+    children: dict[str, list[str]] = {k: [] for k in g.nodes}
+    for k, n in g.nodes.items():
+        for refs in n.inputs.values():
+            for src, _ in refs:
+                children[src].append(k)
+    seen, queue = {nid}, list(children[nid])
+    while queue:
+        x = queue.pop(0)
+        if x in seen:
+            continue
+        seen.add(x)
+        hit = wired_frame_srcs(x)
+        if hit:
+            return hit
+        queue += children[x]
+    return [k for k, n in g.nodes.items()
+            if not n.inputs and (s := REGISTRY.get(n.kind)) and s.outputs and s.outputs[0].type == "frame"]
+
+
+def _columns(params: dict) -> list[str]:
+    """Column names relevant to a node -- feeds the frontend's column-name dropdown."""
+    g = Graph.from_dict(params["graph"])
+    nid = params["node_id"]
+    if nid not in g.nodes:
+        return []
+    cols: set[str] = set()
+    for src in _frame_sources(g, nid):
+        cache, errors, _ = _run_capture(g.upto(src))
+        if src not in errors and cache.get(src) is not None:
+            cols |= set(schema_of(cache[src]).keys())
+    return sorted(cols)
 
 
 def _import_node(params: dict) -> dict:
@@ -158,6 +241,7 @@ HANDLERS = {
     "run_graph": _run_graph,
     "preview": _preview,
     "schema": _schema,
+    "columns": _columns,
     "validate": _validate,
     "import_node": _import_node,
     "create_node": _create_node,

@@ -50,6 +50,63 @@ def test_run_graph_captures_node_error():
     assert "type" in r["result"]["src"]             # upstream still produced a payload
 
 
+def test_missing_required_input_message():
+    # an unwired required port fails with a human message, not KeyError: 'self'
+    g = Graph().add("f", "LazyFrame.filter")
+    r = handle({"id": 20, "method": "run_graph", "params": {"graph": g.to_dict()}})
+    assert "missing required input 'self' (frame)" in r["result"]["f"]["error"]
+
+
+def test_missing_input_allows_literal_param():
+    # a port-or-literal arg (Expr.gt.other) satisfied by a param, not a wire, is NOT flagged
+    g = (Graph().add("col", "expr.column", {"name": "v"})
+         .add("gt", "Expr.gt", {"other": 1}))
+    g.connect("col", "gt", "self")
+    r = handle({"id": 21, "method": "run_graph", "params": {"graph": g.to_dict()}})
+    assert "error" not in r["result"]["gt"]           # param fallback, so no false positive
+
+
+def test_node_log_and_timing():
+    from nota.core.registry import node as reg_node
+
+    @reg_node("test.talky", "Test")
+    def _talky() -> int:
+        import warnings as _w
+        print("stdout line")  # noqa: T201
+        _w.warn("a warning")
+        return 1
+
+    g = Graph().add("n", "test.talky").to_dict()
+    r = handle({"id": 22, "method": "run_graph", "params": {"graph": g}})
+    payload = r["result"]["n"]
+    assert "stdout line" in payload["log"] and "a warning" in payload["log"]
+    assert payload["ms"] >= 0
+
+
+def test_columns_walks_to_the_frame():
+    g = (Graph().add("src", "test.source").add("col", "expr.column", {"name": "v"})
+         .add("gt", "Expr.gt", {"other": 1}).add("flt", "LazyFrame.filter"))
+    g.connect("src", "flt", "self")
+    g.connect("col", "gt", "self")
+    g.connect("gt", "flt", "predicates")
+    doc = g.to_dict()
+    call = lambda nid: handle({"id": 1, "method": "columns", "params": {"graph": doc, "node_id": nid}})["result"]  # noqa: E731
+    assert call("col") == ["g", "v"]                  # expr node walks downstream to filter's frame
+    assert call("flt") == ["g", "v"]
+    empty = handle({"id": 2, "method": "columns", "params": {"graph": {"nodes": []}, "node_id": "x"}})
+    assert empty["result"] == []
+
+
+def test_preview_prunes_to_ancestors():
+    # an unrelated broken sibling must not pollute a preview of pv
+    g = (Graph().add("src", "test.source").add("pv", "sink.preview")
+         .add("bad", "source.csv", {"path": "/nonexistent_for_test.csv"}))
+    g.connect("src", "pv", "frame")
+    r = handle({"id": 23, "method": "preview", "params": {"graph": g.to_dict(), "node_id": "pv"}})
+    assert r["result"]["rows"] == [["a", 1], ["b", 2], ["a", 3]]
+    assert "ms" in r["result"]
+
+
 def test_unknown_method():
     r = handle({"id": 6, "method": "nope", "params": {}})
     assert "error" in r and "unknown method" in r["error"]["message"]

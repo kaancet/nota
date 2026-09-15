@@ -73,6 +73,15 @@ def test_disconnect_and_remove():
     assert "exprs" not in g.nodes["sel"].inputs           # dangling wire stripped
 
 
+def test_upto_keeps_only_ancestors():
+    # chain a->b->c plus a side branch d off a; 'run to c' needs only {a,b,c}
+    g = Graph().add("a", "x").add("b", "y", inputs={"self": [("a", "out")]})
+    g.add("c", "z", inputs={"self": [("b", "out")]})
+    g.add("d", "w", inputs={"self": [("a", "out")]})
+    assert set(g.upto("c").nodes) == {"a", "b", "c"}
+    assert set(g.upto("a").nodes) == {"a"}
+
+
 def test_json_round_trip():
     import nota.nodes  # noqa: F401
     g = Graph().add("src", "test.source").add("pv", "sink.preview")

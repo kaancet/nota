@@ -119,6 +119,21 @@ class Graph:
             raise ValueError("graph has a cycle")
         return order
 
+    def upto(self, nid: str) -> Graph:
+        """The sub-graph of `nid` and its ancestors -- what a 'run to here' needs.
+
+        Raises KeyError on an unknown `nid` (the caller turns it into an error response).
+        """
+        keep: set[str] = set()
+        stack = [nid]
+        while stack:
+            x = stack.pop()
+            if x in keep:
+                continue
+            keep.add(x)
+            stack.extend(src for refs in self.nodes[x].inputs.values() for src, _ in refs)
+        return Graph({k: self.nodes[k] for k in self.nodes if k in keep})
+
     def to_dict(self) -> dict:
         return {
             "nodes": [
