@@ -27,6 +27,12 @@ def test_catalog_groups_by_category():
     assert any(e["kind"] == "sink.preview" for e in tree["Sink"])
 
 
+def test_aliases_on_manifest():
+    m = {e["kind"]: e for e in manifest("common")}
+    assert "distinct" in m["LazyFrame.unique"]["aliases"]   # synonym search data
+    assert "aliases" not in m["source.sample"]              # a node with no synonyms: no key
+
+
 def test_manifest_enrichment():
     m = {e["kind"]: e for e in manifest("common")}
     # #5 examples + doc_url derived from the reflected member

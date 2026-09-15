@@ -94,6 +94,31 @@ WIDGETS: dict[str, dict[str, str]] = {
 }
 
 
+# search synonyms: what a user types vs. the polars name. Injected as `aliases` onto the
+# manifest entry; the palette search matches these too. Listing an unregistered kind is harmless.
+ALIASES: dict[str, list[str]] = {
+    "LazyFrame.unique": ["distinct", "dedupe", "remove duplicates", "drop duplicates"],
+    "LazyFrame.filter": ["where", "rows", "subset"],
+    "LazyFrame.with_columns": ["add column", "mutate", "derive", "assign"],
+    "LazyFrame.select": ["columns", "project", "keep"],
+    "LazyFrame.drop": ["remove column", "delete column"],
+    "LazyFrame.group_by": ["groupby", "aggregate by", "split"],
+    "LazyGroupBy.agg": ["aggregate", "summarise", "summarize"],
+    "LazyFrame.sort": ["order by", "arrange"],
+    "LazyFrame.join": ["merge", "lookup", "vlookup"],
+    "LazyFrame.head": ["top", "limit", "first rows"],
+    "LazyFrame.drop_nulls": ["dropna", "remove missing"],
+    "LazyFrame.fill_null": ["fillna", "replace missing", "impute"],
+    "Expr.cast": ["convert type", "as type", "astype"],
+    "Expr.alias": ["rename", "as"],
+    "Expr.is_in": ["one of", "in list"],
+    "expr.column": ["col", "field"],
+    "sink.preview": ["show", "table", "view"],
+    "sink.write_csv": ["export", "save csv"],
+    "source.csv": ["load", "open", "import csv"],
+}
+
+
 def _default_category(kind: str) -> str:
     if kind.count(".") >= 2 and kind.startswith("Expr."):
         return "Expr." + kind.split(".")[1]      # namespace: Expr.str, Expr.dt, ...
@@ -126,4 +151,6 @@ def decorate(entry: dict) -> dict | None:
     for p in entry["params"]:
         if p["name"] in widgets:
             p["widget"] = widgets[p["name"]]
+    if kind in ALIASES:
+        entry["aliases"] = ALIASES[kind]
     return entry  # enum `choices` now come from Literal reflection in registry.build_spec
