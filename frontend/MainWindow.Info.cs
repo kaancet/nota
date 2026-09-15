@@ -54,6 +54,15 @@ public partial class MainWindow : Window
             Margin = new Thickness(0, 4, 0, 0),
         });
 
+        // search synonyms (1.6): what a user might type to find this node
+        if (t.Aliases is { Count: > 0 } aliases)
+            root.Children.Add(new TextBlock
+            {
+                Text = "also: " + string.Join(", ", aliases),
+                TextWrapping = TextWrapping.Wrap, Foreground = ThemeSubtext, FontSize = 11,
+                Margin = new Thickness(0, 2, 0, 0),
+            });
+
         if (t.Inputs.Count > 0) { root.Children.Add(Section("Inputs")); foreach (Port p in t.Inputs) root.Children.Add(PortLine(p)); }
         if (t.Outputs.Count > 0) { root.Children.Add(Section("Outputs")); foreach (Port p in t.Outputs) root.Children.Add(PortLine(p)); }
         if (t.Params.Count > 0) { root.Children.Add(Section("Parameters")); foreach (ParamSpec p in t.Params) root.Children.Add(ParamLine(p)); }

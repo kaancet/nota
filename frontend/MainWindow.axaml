@@ -23,6 +23,9 @@
             <NativeMenuItem Header="Edit">
                 <NativeMenuItem.Menu>
                     <NativeMenu>
+                        <NativeMenuItem Header="Find Node…" Gesture="Cmd+K" Click="OnFindNode"/>
+                        <NativeMenuItem Header="Copy" Click="OnCopy"/>
+                        <NativeMenuItem Header="Paste" Click="OnPaste"/>
                         <NativeMenuItem Header="Group into Node…" Gesture="Cmd+G" Click="OnGroupNodes"/>
                         <NativeMenuItem Header="Import Python Function as Node…" Click="OnImportNode"/>
                         <NativeMenuItem Header="Nodes">
@@ -46,6 +49,7 @@
             <NativeMenuItem Header="View">
                 <NativeMenuItem.Menu>
                     <NativeMenu>
+                        <NativeMenuItem Header="Zoom to Fit" Gesture="Cmd+0" Click="OnZoomToFit"/>
                         <NativeMenuItem Header="Theme">
                             <NativeMenuItem.Menu>
                                 <NativeMenu>
@@ -91,7 +95,13 @@
         <!-- ============ CENTER: canvas over output table ============ -->
         <Grid Grid.Column="2" RowDefinitions="*,4,220">
             <Border Grid.Row="0" x:Name="CanvasViewport" Background="{DynamicResource NotaCanvas}" ClipToBounds="True">
-                <Canvas x:Name="NodeCanvas" Background="Transparent" Focusable="True"/>
+                <Grid>
+                    <Canvas x:Name="NodeCanvas" Background="Transparent" Focusable="True"/>
+                    <TextBlock x:Name="EmptyHint" IsHitTestVisible="False"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                               Foreground="{DynamicResource NotaSubtext}" FontSize="13"
+                               Text="Drag a node from the palette&#x0a;Shift+A to search · File › Load Example"/>
+                </Grid>
             </Border>
             <GridSplitter Grid.Row="1" Background="{DynamicResource NotaSplitter}" HorizontalAlignment="Stretch"/>
             <Border Grid.Row="2" Background="{DynamicResource NotaSurface}">

@@ -249,8 +249,18 @@ public partial class MainWindow : Window
             e.Handled = true;
             return;
         }
+        bool typing = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() is TextBox;
+        // Cmd/Ctrl+Z undo, +Shift+Z redo, +C copy, +V paste -- but never while typing in a field
+        if (!typing && Cmd(e))
+        {
+            if (e.Key == Key.Z && e.KeyModifiers.HasFlag(KeyModifiers.Shift)) { Redo(); e.Handled = true; return; }
+            if (e.Key == Key.Z) { Undo(); e.Handled = true; return; }
+            if (e.Key == Key.C) { OnCopy(this, EventArgs.Empty); e.Handled = true; return; }
+            if (e.Key == Key.V) { OnPaste(this, EventArgs.Empty); e.Handled = true; return; }
+        }
         if (e.Key is Key.Delete or Key.Back)
         {
+            if (_selWires.Count > 0 || _selNodes.Count > 0 || _selBoxes.Count > 0) Snapshot();
             foreach (Wire w in _selWires.ToList()) RemoveWire(w);
             foreach (Border b in _selNodes.ToList()) RemoveNode(b);
             foreach (Border bx in _selBoxes.ToList()) { NodeCanvas.Children.Remove(bx); _selBoxes.Remove(bx); }

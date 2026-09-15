@@ -22,7 +22,8 @@ public record NodeType(
     List<Port> Outputs,
     List<ParamSpec> Params,
     string Examples = "",
-    string? DocUrl = null);
+    string? DocUrl = null,
+    List<string>? Aliases = null);   // search synonyms (protocol 1.6); null/empty when the kind has none
 
 
 // Identifies one specific port on one placed node. Stored on each port dot's Tag,

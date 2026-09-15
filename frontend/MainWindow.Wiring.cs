@@ -81,7 +81,10 @@ public partial class MainWindow : Window
         if (targetDot?.Tag is PortRef target)
         {
             if (CanConnect(_wireSource, target))
+            {
+                Snapshot();
                 AddWire(_wireSourceDot!, targetDot);
+            }
             else
                 StatusText.Text = ReferenceEquals(_wireSource.Node, target.Node)
                     ? "can't connect a node to itself"

@@ -104,16 +104,19 @@ public partial class MainWindow : Window
 
         // category sections respect the tier toggle; search always spans every tier
         IEnumerable<NodeType> pool = _showAll || searching ? _allTypes : _allTypes.Where(t => t.Tier == "common");
-        IEnumerable<NodeType> matched = searching
-            ? pool.Where(t => t.Label.Contains(f, StringComparison.OrdinalIgnoreCase)
-                           || t.Kind.Contains(f, StringComparison.OrdinalIgnoreCase))
-            : pool;
+        IEnumerable<NodeType> matched = searching ? pool.Where(t => Matches(t, f)) : pool;
 
         foreach (IGrouping<string, NodeType> g in matched.GroupBy(t => t.Category))
             AddPaletteSection(g.Key, g.ToList(), searching);
     }
 
     private NodeType? FindType(string kind) => _allTypes.FirstOrDefault(t => t.Kind == kind);
+
+    // palette/quick-add search: label, kind, or any synonym (1.6 aliases) contains the query
+    private static bool Matches(NodeType t, string q) =>
+        t.Label.Contains(q, StringComparison.OrdinalIgnoreCase)
+        || t.Kind.Contains(q, StringComparison.OrdinalIgnoreCase)
+        || (t.Aliases?.Any(a => a.Contains(q, StringComparison.OrdinalIgnoreCase)) ?? false);
 
     // one collapsible palette section: a header (chevron + swatch + count) over an Nx-card WrapPanel.
     private void AddPaletteSection(string title, List<NodeType> items, bool forceOpen)
@@ -262,6 +265,7 @@ public partial class MainWindow : Window
     private void AddNodeCascade(NodeType t)
     {
         double offset = 40 + (_nodes.Count % 12) * 26;   // cascade so drops don't stack
+        Snapshot();
         AddNode(t, offset, offset, $"n{_nextId++}•");
         PushRecent(t.Kind);
     }
@@ -291,7 +295,10 @@ public partial class MainWindow : Window
         Outputs: ParsePorts(node.GetProperty("outputs")),
         Params: ParseParams(node.GetProperty("params")),
         Examples: Opt(node, "examples")?.GetString() ?? "",
-        DocUrl: Opt(node, "doc_url")?.GetString());
+        DocUrl: Opt(node, "doc_url")?.GetString(),
+        Aliases: Opt(node, "aliases") is JsonElement a
+            ? a.EnumerateArray().Select(x => x.GetString()!).ToList()
+            : null);
 
     // a property if present and non-null, else null (protocol 1.1 fields are optional)
     private static JsonElement? Opt(JsonElement e, string name) =>
@@ -418,6 +425,7 @@ public partial class MainWindow : Window
         NodeType? type = _allTypes.FirstOrDefault(x => x.Kind == kind);
         if (type is null) return;
         Point w = e.GetPosition(NodeCanvas);   // world space (through zoom/pan), like a marquee anchor
+        Snapshot();
         AddNode(type, w.X, w.Y, $"n{_nextId++}•");
         PushRecent(type.Kind);
     }
@@ -442,7 +450,15 @@ public partial class MainWindow : Window
         Canvas.SetLeft(box, x);
         Canvas.SetTop(box, y);
         NodeCanvas.Children.Add(box);
+        UpdateEmptyHint();
         return instance;
+    }
+
+    // Edit > Find Node (Cmd+K): jump to the palette search box
+    private void OnFindNode(object? sender, EventArgs e)
+    {
+        SearchBox.Focus();
+        SearchBox.SelectAll();
     }
 
 }

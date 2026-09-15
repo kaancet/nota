@@ -13,9 +13,12 @@ public class Backend : IDisposable
     private readonly Process _process;
     private readonly StreamWriter? _errLog;   // backend stderr -> a log file, so a crash is diagnosable
 
+    public string RepoDir { get; }   // where pyproject.toml lives -> examples/, docs/ resolve against it
+
     public Backend()
     {
         var (python, repo) = Resolve();
+        RepoDir = repo;
         var startInfo = new ProcessStartInfo
         {
             FileName = python,

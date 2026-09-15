@@ -53,19 +53,7 @@ public partial class MainWindow : Window
         });
         if (file is null) return;   // cancelled
 
-        var doc = new SavedGraph(1,
-            _nodes.Select(n => new SavedNode(n.Id, n.Type.Kind, n.X, n.Y, n.Params, n.Collapsed)).ToList(),
-            _edges.Select(ed => new SavedEdge(ed.SourceId, ed.SourceOut, ed.TargetId, ed.TargetIn)).ToList(),
-            NodeCanvas.Children.OfType<Border>().Where(b => b.Tag is GroupBox or TextNote)
-                .Select(b =>
-                {
-                    if (b.Tag is TextNote tn)
-                        return new SavedBox(Canvas.GetLeft(b), Canvas.GetTop(b), b.Width, b.Height,
-                                           tn.Text.Text ?? "", 0, "text");
-                    var gb = (GroupBox)b.Tag!;
-                    return new SavedBox(Canvas.GetLeft(b), Canvas.GetTop(b), b.Width, b.Height,
-                                       gb.Name.Text ?? "", gb.ColorIdx);
-                }).ToList());
+        SavedGraph doc = BuildSavedGraph();
         try
         {
             await using Stream stream = await file.OpenWriteAsync();
@@ -133,7 +121,11 @@ public partial class MainWindow : Window
     {
         TopLevel? top = TopLevel.GetTopLevel(this);
         if (top is null) return;
-        string dir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nota", "examples");
+        // prefer the repo's examples/ (shipped, git-tracked); fall back to ~/.nota/examples
+        string repoExamples = _backend is not null ? System.IO.Path.Combine(_backend.RepoDir, "examples") : "";
+        string dir = System.IO.Directory.Exists(repoExamples)
+            ? repoExamples
+            : System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nota", "examples");
         System.IO.Directory.CreateDirectory(dir);
         IStorageFolder? start = await top.StorageProvider.TryGetFolderFromPathAsync(dir);
         IReadOnlyList<IStorageFile> files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
@@ -159,6 +151,7 @@ public partial class MainWindow : Window
         SavedGraph? doc = JsonSerializer.Deserialize<SavedGraph>(json);
         if (doc is null) { StatusText.Text = "load error: empty file"; return; }
 
+        if (!_restoring) { _undo.Clear(); _redo.Clear(); }   // a fresh user load starts a new history
         ClearGraph();
         var byId = new Dictionary<string, NodeInstance>();
         int skipped = 0;
@@ -209,6 +202,7 @@ public partial class MainWindow : Window
         _results = new Dictionary<string, JsonElement>();
         InfoArea.Content = new TextBlock { Text = "(click a node)", Foreground = ThemeSubtext };
         RefreshOutput();
+        UpdateEmptyHint();
     }
 
     // keep handed-out ids unique after a load: advance past any numeric id in the file

@@ -117,6 +117,38 @@ public partial class MainWindow : Window
         UpdateWires();
     }
 
+    // Cmd+0: fit the selection (if any) else all nodes into the viewport, scaling + centering.
+    private void OnZoomToFit(object? sender, EventArgs e)
+    {
+        IEnumerable<NodeInstance> set = _selNodes.Count > 0
+            ? _selNodes.Select(b => b.Tag).OfType<NodeInstance>()
+            : _nodes;
+        ZoomToFit(set.ToList());
+    }
+
+    private void ZoomToFit(IReadOnlyList<NodeInstance> set)
+    {
+        if (set.Count == 0) return;
+        double minX = double.MaxValue, minY = double.MaxValue, maxX = double.MinValue, maxY = double.MinValue;
+        foreach (NodeInstance n in set)
+        {
+            Border? box = NodeCanvas.Children.OfType<Border>().FirstOrDefault(b => ReferenceEquals(b.Tag, n));
+            double w = box?.Bounds.Width ?? 150, h = box?.Bounds.Height ?? 80;
+            minX = Math.Min(minX, n.X); minY = Math.Min(minY, n.Y);
+            maxX = Math.Max(maxX, n.X + w); maxY = Math.Max(maxY, n.Y + h);
+        }
+        double bw = maxX - minX, bh = maxY - minY;
+        double vw = CanvasViewport.Bounds.Width, vh = CanvasViewport.Bounds.Height;
+        double scale = Math.Clamp(Math.Min(vw / (bw + 80), vh / (bh + 80)), 0.2, 1.5);
+        _zoom.ScaleX = _zoom.ScaleY = scale;
+        _pan.X = vw / 2 - scale * (minX + bw / 2);
+        _pan.Y = vh / 2 - scale * (minY + bh / 2);
+        UpdateWires();
+    }
+
+    // show the empty-canvas hint only when there are no nodes
+    private void UpdateEmptyHint() => EmptyHint.IsVisible = _nodes.Count == 0;
+
     // --- canvas pointer: marquee (left) + group box (right) + pan (middle) + zoom (wheel) ---
 
     // a faint tiling grid drawn in world space (inside NodeCanvas) -> it pans/zooms with the content,
@@ -302,8 +334,9 @@ public partial class MainWindow : Window
             },
         };
 
-        groupBtn.PointerPressed += (_, _) => { FinalizeBox(box, colorIdx); _boxColorIdx++; popup.IsOpen = false; };
-        textBtn.PointerPressed += (_, _) => { FinalizeTextNote(box); popup.IsOpen = false; };
+        // snapshot before finalize: the drawn box isn't tagged yet, so this captures the pre-box state
+        groupBtn.PointerPressed += (_, _) => { Snapshot(); FinalizeBox(box, colorIdx); _boxColorIdx++; popup.IsOpen = false; };
+        textBtn.PointerPressed += (_, _) => { Snapshot(); FinalizeTextNote(box); popup.IsOpen = false; };
         popup.Closed += (_, _) =>
         {
             NodeCanvas.Children.Remove(popup);
@@ -495,6 +528,7 @@ public partial class MainWindow : Window
         NodeCanvas.Children.Remove(box);
         _nodes.Remove(node);
         _selNodes.Remove(box);
+        UpdateEmptyHint();
     }
 
     // one row in the quick-add list: a category to drill into, or a node to add
@@ -532,8 +566,7 @@ public partial class MainWindow : Window
             string q = search.Text?.Trim() ?? "";
             List<QaItem> items;
             if (q.Length > 0)                                  // search: flat, across everything
-                items = _allTypes.Where(t => t.Label.Contains(q, StringComparison.OrdinalIgnoreCase)
-                                          || t.Kind.Contains(q, StringComparison.OrdinalIgnoreCase))
+                items = _allTypes.Where(t => Matches(t, q))
                                  .Take(60).Select(t => new QaItem(false, t.Category, t)).ToList();
             else if (_qaCategory is null)                      // top level: category list
                 items = _allTypes.Select(t => t.Category).Distinct()
@@ -549,7 +582,7 @@ public partial class MainWindow : Window
 
         void Commit(NodeType? t)
         {
-            if (t is not null) { AddNode(t, _lastCanvasWorld.X, _lastCanvasWorld.Y, $"n{_nextId++}•"); PushRecent(t.Kind); }
+            if (t is not null) { Snapshot(); AddNode(t, _lastCanvasWorld.X, _lastCanvasWorld.Y, $"n{_nextId++}•"); PushRecent(t.Kind); }
             CloseQuickAdd();
         }
         void Activate(QaItem? it)

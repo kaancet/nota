@@ -64,6 +64,7 @@ public partial class MainWindow : Window
             SelectNode(box, additive: false);
         _dragging = box;
         _nodeMoved = false;                 // reset; a press with no move is a click (select)
+        _preDrag = SerializeGraph();        // captured now; pushed on release only if the node actually moved
         _grabOffset = e.GetPosition(box);   // pointer position WITHIN the node
         e.Pointer.Capture(box);
     }
@@ -130,6 +131,8 @@ public partial class MainWindow : Window
 
         if (!_nodeMoved && _dragging is not null)
             SelectNode(_dragging, e.KeyModifiers.HasFlag(KeyModifiers.Shift));   // click (no drag) selects
+        if (_nodeMoved && _preDrag is not null) PushUndo(_preDrag);              // a real move is undoable
+        _preDrag = null;
         _dragging = null;
         e.Pointer.Capture(null);
     }
@@ -280,7 +283,7 @@ public partial class MainWindow : Window
         return panel.Children.Count == 0 ? null : panel;
     }
 
-    private static Control ParamRow(NodeInstance node, ParamSpec p, Action? refreshLayout = null)
+    private Control ParamRow(NodeInstance node, ParamSpec p, Action? refreshLayout = null)
     {
         if (p.Widget == "kvlist") return BuildKvList(node, p, refreshLayout);   // dynamic key/value row editor (dict.build)
         if (p.Widget == "code") return CodeWidget(node, p);   // multiline editor (transform.sql/python, expr.sql)
@@ -313,6 +316,7 @@ public partial class MainWindow : Window
 
         TextBox field = CompactBox(node.Params[p.Name]?.ToString() ?? "");
         field.TextChanged += (_, _) => node.Params[p.Name] = Coerce(field.Text ?? "", p.Type);
+        AddEditHistory(field);   // one undo entry per focus session, not per keystroke
 
         // a "path" param gets a Browse… button that opens the OS file picker
         bool isPath = p.Name is "path" or "preset";
@@ -350,7 +354,7 @@ public partial class MainWindow : Window
     }
 
     // a multiline monospace code editor: label on top, box below (full node width). Enter = newline.
-    private static Control CodeWidget(NodeInstance node, ParamSpec p)
+    private Control CodeWidget(NodeInstance node, ParamSpec p)
     {
         TextBox box = CompactBox(node.Params[p.Name]?.ToString() ?? "");
         box.AcceptsReturn = true;
@@ -360,6 +364,7 @@ public partial class MainWindow : Window
         box.MinWidth = 220;
         box.FontFamily = new FontFamily("Consolas, Menlo, monospace");
         box.TextChanged += (_, _) => node.Params[p.Name] = Coerce(box.Text ?? "", p.Type);
+        AddEditHistory(box);
 
         var label = new TextBlock
         {
@@ -385,34 +390,34 @@ public partial class MainWindow : Window
         VerticalContentAlignment = VerticalAlignment.Center,
     };
 
-    private static Control BoolWidget(NodeInstance node, ParamSpec p)
+    private Control BoolWidget(NodeInstance node, ParamSpec p)
     {
         var cb = new CheckBox
         {
             Content = p.Name,
-            IsChecked = node.Params[p.Name] as bool? ?? false,
+            IsChecked = node.Params[p.Name] as bool? ?? false,   // set before the handler -> no spurious snapshot
             FontSize = 11,
             MinHeight = 0,
             Padding = new Thickness(4, 0, 0, 0),
         };
-        cb.IsCheckedChanged += (_, _) => node.Params[p.Name] = cb.IsChecked;
+        cb.IsCheckedChanged += (_, _) => { Snapshot(); node.Params[p.Name] = cb.IsChecked; };
         return cb;
     }
 
     // enum param -> a dropdown of its curated choices (#3)
-    private static Control ChoiceWidget(NodeInstance node, ParamSpec p)
+    private Control ChoiceWidget(NodeInstance node, ParamSpec p)
     {
         var combo = new ComboBox
         {
             ItemsSource = p.Choices,
-            SelectedItem = node.Params[p.Name]?.ToString(),
+            SelectedItem = node.Params[p.Name]?.ToString(),   // set before the handler -> no spurious snapshot
             FontSize = 11,
             MinHeight = 0,
             Height = 24,
             Padding = new Thickness(6, 1),
             HorizontalAlignment = HorizontalAlignment.Stretch,
         };
-        combo.SelectionChanged += (_, _) => node.Params[p.Name] = combo.SelectedItem as string;
+        combo.SelectionChanged += (_, _) => { Snapshot(); node.Params[p.Name] = combo.SelectedItem as string; };
         return combo;
     }
 
@@ -423,7 +428,7 @@ public partial class MainWindow : Window
 
     private static readonly string[] KvTypes = { "auto", "str", "int", "float", "bool", "json" };
 
-    private static Control BuildKvList(NodeInstance node, ParamSpec p, Action? refreshLayout = null)
+    private Control BuildKvList(NodeInstance node, ParamSpec p, Action? refreshLayout = null)
     {
         var rowsPanel = new StackPanel { Spacing = 3 };
         var rows = new List<(TextBox Key, TextBox Val, ComboBox Type)>();
@@ -459,7 +464,7 @@ public partial class MainWindow : Window
             k.TextChanged += (_, _) => Commit();
             v.TextChanged += (_, _) => Commit();
             ty.SelectionChanged += (_, _) => Commit();
-            del.Click += (_, _) => { rows.Remove(entry); rowsPanel.Children.Remove(row); Commit(); refreshLayout?.Invoke(); };
+            del.Click += (_, _) => { Snapshot(); rows.Remove(entry); rowsPanel.Children.Remove(row); Commit(); refreshLayout?.Invoke(); };
             rowsPanel.Children.Add(row);
         }
 
@@ -477,7 +482,7 @@ public partial class MainWindow : Window
             Content = "+ add row", FontSize = 11, Padding = new Thickness(6, 2),
             Margin = new Thickness(0, 2, 0, 0), HorizontalAlignment = HorizontalAlignment.Left,
         };
-        add.Click += (_, _) => { AddRow("", "", "auto"); refreshLayout?.Invoke(); };
+        add.Click += (_, _) => { Snapshot(); AddRow("", "", "auto"); refreshLayout?.Invoke(); };
 
         var panel = new StackPanel { Spacing = 3, Margin = new Thickness(10, 4, 10, 4) };
         panel.Children.Add(new TextBlock { Text = p.Name, FontSize = 11, Foreground = ThemeSubtext });
