@@ -283,6 +283,7 @@ public partial class MainWindow : Window
     private static Control ParamRow(NodeInstance node, ParamSpec p, Action? refreshLayout = null)
     {
         if (p.Widget == "kvlist") return BuildKvList(node, p, refreshLayout);   // dynamic key/value row editor (dict.build)
+        if (p.Widget == "code") return CodeWidget(node, p);   // multiline editor (transform.sql/python, expr.sql)
         if (p.Type == "bool") return BoolWidget(node, p);   // checkbox carries its own label
 
         // one compact row: grey label on the left, a slim flat field on the right
@@ -346,6 +347,26 @@ public partial class MainWindow : Window
 
         if (files.Count > 0)
             field.Text = files[0].Path.LocalPath;   // setting Text fires TextChanged -> updates node.Params
+    }
+
+    // a multiline monospace code editor: label on top, box below (full node width). Enter = newline.
+    private static Control CodeWidget(NodeInstance node, ParamSpec p)
+    {
+        TextBox box = CompactBox(node.Params[p.Name]?.ToString() ?? "");
+        box.AcceptsReturn = true;
+        box.TextWrapping = TextWrapping.Wrap;
+        box.MinHeight = 60;
+        box.Height = double.NaN;
+        box.MinWidth = 220;
+        box.FontFamily = new FontFamily("Consolas, Menlo, monospace");
+        box.TextChanged += (_, _) => node.Params[p.Name] = Coerce(box.Text ?? "", p.Type);
+
+        var label = new TextBlock
+        {
+            Text = p.Name, FontSize = 11, Foreground = ThemeSubtext, Margin = new Thickness(0, 0, 0, 2),
+        };
+        ToolTip.SetTip(label, DocTip(p.Doc, p.Name));
+        return new StackPanel { Children = { label, box } };
     }
 
     // a slim, flat, borderless input field (Blender-ish)

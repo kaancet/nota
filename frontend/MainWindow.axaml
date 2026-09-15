@@ -35,6 +35,14 @@
                     </NativeMenu>
                 </NativeMenuItem.Menu>
             </NativeMenuItem>
+            <NativeMenuItem Header="Run">
+                <NativeMenuItem.Menu>
+                    <NativeMenu>
+                        <NativeMenuItem Header="Run" Gesture="Cmd+R" Click="OnRunMenu"/>
+                        <NativeMenuItem Header="Run to Selected Node" Gesture="Cmd+Shift+R" Click="OnRunToNode"/>
+                    </NativeMenu>
+                </NativeMenuItem.Menu>
+            </NativeMenuItem>
             <NativeMenuItem Header="View">
                 <NativeMenuItem.Menu>
                     <NativeMenu>

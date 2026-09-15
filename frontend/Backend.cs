@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using System.Threading.Tasks;
 
 
 namespace Nota;
@@ -10,6 +11,7 @@ namespace Nota;
 public class Backend : IDisposable
 {
     private readonly Process _process;
+    private readonly StreamWriter? _errLog;   // backend stderr -> a log file, so a crash is diagnosable
 
     public Backend()
     {
@@ -21,10 +23,23 @@ public class Backend : IDisposable
             WorkingDirectory = repo,
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
+            RedirectStandardError = true,
             UseShellExecute = false,
         };
         _process = Process.Start(startInfo)
             ?? throw new InvalidOperationException($"failed to start: {python}");
+
+        try
+        {
+            string logDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nota", "logs");
+            Directory.CreateDirectory(logDir);
+            _errLog = new StreamWriter(Path.Combine(logDir, "backend-stderr.log"), append: true) { AutoFlush = true };
+        }
+        catch { _errLog = null; /* logging is best-effort; never block startup */ }
+
+        _process.ErrorDataReceived += (_, e) => { if (e.Data != null) _errLog?.WriteLine(e.Data); };
+        _process.BeginErrorReadLine();
     }
 
     private static (string python, string repo) Resolve()
@@ -64,14 +79,32 @@ public class Backend : IDisposable
     }
 
 
-    public JsonElement Request(string method, object? parameters = null)
+    // A crashed backend must not hang the UI on ReadLine forever. If it has already exited, fail
+    // loudly; when a timeout is given (the handshake), bound the wait. Long runs pass no timeout.
+    public JsonElement Request(string method, object? parameters = null, TimeSpan? timeout = null)
     {
-        string request = JsonSerializer.Serialize(new { id = 1, method, @params = parameters });
+        if (_process.HasExited)
+            throw new InvalidOperationException(
+                $"backend exited (code {_process.ExitCode}); see ~/.nota/logs/backend-stderr.log");
 
+        string request = JsonSerializer.Serialize(new { id = 1, method, @params = parameters });
         _process.StandardInput.WriteLine(request);
         _process.StandardInput.Flush();
 
-        string? line = _process.StandardOutput.ReadLine();
+        string? line;
+        if (timeout is TimeSpan t)
+        {
+            var task = Task.Run(() => _process.StandardOutput.ReadLine());
+            if (!task.Wait(t))
+                throw new TimeoutException(
+                    $"backend did not answer within {t.TotalSeconds:0}s; see ~/.nota/logs/backend-stderr.log");
+            line = task.Result;
+        }
+        else
+        {
+            line = _process.StandardOutput.ReadLine();
+        }
+
         if (line is null)
             throw new InvalidOperationException("backend closed the connection (no response)");
         using var doc = JsonDocument.Parse(line);
@@ -90,6 +123,7 @@ public class Backend : IDisposable
             }
         }
         catch { /* process already gone */ }
+        _errLog?.Dispose();
         _process.Dispose();
     }
 }

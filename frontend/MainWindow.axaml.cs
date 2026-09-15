@@ -157,22 +157,33 @@ public partial class MainWindow : Window
         LoadNodes();
     }
 
-    private JsonElement? BackendRequest(string method, object? parameters = null)
+    private JsonElement? BackendRequest(string method, object? parameters = null, TimeSpan? timeout = null)
     {
         if (_backend is null) { StatusText.Text = "backend not connected"; return null; }
-        return _backend.Request(method, parameters);
+        return _backend.Request(method, parameters, timeout);
     }
+
+    private const string ProtocolMajor = "1";   // PROTOCOL.md: the frontend refuses a MAJOR mismatch
 
     private void ShowProtocolVersion()
     {
         try
         {
-            JsonElement response = BackendRequest("server_info") ?? default;
+            JsonElement response = BackendRequest("server_info", null, TimeSpan.FromSeconds(30)) ?? default;
             string? version = response
                 .GetProperty("result")
                 .GetProperty("protocol_version")
                 .GetString();
-            StatusText.Text = $"connected — protocol {version}";
+            string major = (version ?? "").Split('.')[0];
+            if (major != ProtocolMajor)
+            {
+                StatusText.Text = $"protocol mismatch (server {version}, app {ProtocolMajor}) — update";
+                RunButton.IsEnabled = false;   // stale protocol -> disable Run rather than send bad requests
+            }
+            else
+            {
+                StatusText.Text = $"connected — protocol {version}";
+            }
         }
         catch (Exception ex)
         {

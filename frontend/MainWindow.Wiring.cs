@@ -78,8 +78,15 @@ public partial class MainWindow : Window
 
         Shape? targetDot = FindInputDotAt(e.GetPosition(NodeCanvas));
         NodeCanvas.Children.Remove(_rubberBand!);         // discard the rubber-band; a real wire is made below
-        if (targetDot?.Tag is PortRef target && CanConnect(_wireSource, target))
-            AddWire(_wireSourceDot!, targetDot);
+        if (targetDot?.Tag is PortRef target)
+        {
+            if (CanConnect(_wireSource, target))
+                AddWire(_wireSourceDot!, targetDot);
+            else
+                StatusText.Text = ReferenceEquals(_wireSource.Node, target.Node)
+                    ? "can't connect a node to itself"
+                    : $"can't connect: {_wireSource.Port.Type} → '{target.Port.Name}' wants {target.Port.Type}";
+        }
 
         if (_wireHoverDot is not null) { SetPortHover(_wireHoverDot, false); _wireHoverDot = null; }
         if (_wireSourceDot is not null) SetPortHover(_wireSourceDot, false);   // it was left hovered from the initial enter
@@ -116,6 +123,31 @@ public partial class MainWindow : Window
             FromOffset = LocalOffset(fromDot),
             ToOffset = LocalOffset(toDot),
         });
+    }
+
+    // --- failed-node highlighting (#1.15) ---
+
+    // a node's resting border color, driven by the last run: red = it failed, amber = a node
+    // upstream failed, else the neutral blue. Used everywhere a border is reset to non-selected.
+    private IBrush BaseBrush(NodeInstance n)
+    {
+        if (_results.TryGetValue(n.Id, out JsonElement p) && p.ValueKind == JsonValueKind.Object
+            && p.TryGetProperty("error", out JsonElement err))
+            return (err.GetString() ?? "").StartsWith("upstream") ? Brush("#FB8C00") : Brush("#E53935");
+        return Brushes.SteelBlue;
+    }
+
+    // after a run: recolor every unselected node from its result, tooltip = its error (or clear it)
+    private void RefreshHighlights()
+    {
+        foreach (Border b in NodeCanvas.Children.OfType<Border>())
+        {
+            if (b.Tag is not NodeInstance n) continue;
+            string? err = _results.TryGetValue(n.Id, out JsonElement p) && p.ValueKind == JsonValueKind.Object
+                && p.TryGetProperty("error", out JsonElement e) ? e.GetString() : null;
+            ToolTip.SetTip(b, err);                       // null clears the tip
+            if (!_selNodes.Contains(b)) b.BorderBrush = BaseBrush(n);
+        }
     }
 
     // the canvas Border whose model is this node

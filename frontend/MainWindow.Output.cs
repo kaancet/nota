@@ -38,17 +38,67 @@ public partial class MainWindow : Window
 
     private static Control BuildOutput(JsonElement p)
     {
+        Control body;
         if (p.TryGetProperty("error", out JsonElement err))
-            return Scroll(new TextBlock { Text = err.GetString(), Foreground = Brushes.IndianRed, TextWrapping = TextWrapping.Wrap });
+            body = Scroll(new TextBlock { Text = err.GetString(), Foreground = Brushes.IndianRed, TextWrapping = TextWrapping.Wrap });
+        else
+            body = p.GetProperty("type").GetString() switch
+            {
+                "frame" => BuildTable(p),   // a DataGrid -> brings its own virtualized scrolling
+                "expr" => Scroll(new TextBlock { Text = p.GetProperty("repr").GetString(), Foreground = ThemeText, TextWrapping = TextWrapping.Wrap }),
+                "html" => Scroll(BuildPlotOutput(p)),
+                _ => Scroll(new TextBlock { Text = CellText(p.GetProperty("value")), Foreground = ThemeText, TextWrapping = TextWrapping.Wrap }),
+            };
 
-        return p.GetProperty("type").GetString() switch
+        // wrap body with a header line (shape/ms) on top and the node's captured log on the bottom (1.6)
+        var dock = new DockPanel { LastChildFill = true };
+        Control? header = BuildHeader(p);
+        if (header is not null) { DockPanel.SetDock(header, Dock.Top); dock.Children.Add(header); }
+        if (p.TryGetProperty("log", out JsonElement logEl) && logEl.ValueKind == JsonValueKind.String
+            && !string.IsNullOrEmpty(logEl.GetString()))
         {
-            "frame" => BuildTable(p),   // a DataGrid -> brings its own virtualized scrolling
-            "expr" => Scroll(new TextBlock { Text = p.GetProperty("repr").GetString(), Foreground = ThemeText, TextWrapping = TextWrapping.Wrap }),
-            "html" => Scroll(BuildPlotOutput(p)),
-            _ => Scroll(new TextBlock { Text = CellText(p.GetProperty("value")), Foreground = ThemeText, TextWrapping = TextWrapping.Wrap }),
-        };
+            Control log = BuildLog(logEl.GetString()!);
+            DockPanel.SetDock(log, Dock.Bottom);
+            dock.Children.Add(log);
+        }
+        dock.Children.Add(body);
+        return dock;
     }
+
+    // one grey line: "N rows × M cols · first 50 shown · +K more columns hidden · 1.6 ms"
+    private static Control? BuildHeader(JsonElement p)
+    {
+        var parts = new List<string>();
+        if (p.TryGetProperty("type", out JsonElement t) && t.GetString() == "frame" && p.TryGetProperty("shape", out JsonElement shp))
+        {
+            JsonElement[] dims = shp.EnumerateArray().ToArray();
+            string rows = dims[0].ValueKind == JsonValueKind.Null ? "?" : dims[0].GetInt32().ToString();
+            int cols = dims[1].GetInt32();
+            parts.Add($"{rows} rows × {cols} cols");
+            if (p.TryGetProperty("truncated", out JsonElement tr) && tr.ValueKind == JsonValueKind.True) parts.Add("first 50 shown");
+            int shown = p.GetProperty("columns").GetArrayLength();
+            if (cols - shown > 0) parts.Add($"+{cols - shown} more columns hidden");
+        }
+        if (p.TryGetProperty("ms", out JsonElement ms) && ms.ValueKind == JsonValueKind.Number) parts.Add($"{ms.GetDouble()} ms");
+        return parts.Count == 0 ? null
+            : new TextBlock { Text = string.Join(" · ", parts), Foreground = ThemeSubtext, FontSize = 11, Margin = new Thickness(2, 0, 0, 4) };
+    }
+
+    // the node's captured stdout + warnings, monospace, in a short scroller docked below the output
+    private static Control BuildLog(string text) => new ScrollViewer
+    {
+        MaxHeight = 90,
+        Margin = new Thickness(0, 4, 0, 0),
+        Content = new StackPanel
+        {
+            Children =
+            {
+                new TextBlock { Text = "log", Foreground = ThemeSubtext, FontSize = 10, Margin = new Thickness(2, 0, 0, 1) },
+                new TextBlock { Text = text, FontFamily = new FontFamily("Consolas, Menlo, monospace"),
+                    FontSize = 11, Foreground = ThemeText, TextWrapping = TextWrapping.Wrap },
+            },
+        },
+    };
 
     // wrap non-table output so long content scrolls (OutputArea is a bare ContentControl now)
     private static Control Scroll(Control c) => new ScrollViewer
@@ -106,24 +156,16 @@ public partial class MainWindow : Window
             MaxColumnWidth = 320,
             FontSize = 12,
         };
+        // column header = "name  dtype" (dtype from the payload schema); falls back to the bare name.
+        bool hasSchema = p.TryGetProperty("schema", out JsonElement schema);
         for (int i = 0; i < cols.Count; i++)
-            dg.Columns.Add(new DataGridTextColumn { Header = cols[i], Binding = new Binding($"[{i}]") });
-
-        // shape[1] is the TRUE column count; if the backend capped the payload, say how many are hidden
-        int total = p.GetProperty("shape").EnumerateArray().Last().GetInt32();
-        int hidden = total - cols.Count;
-        if (hidden <= 0) return dg;
-
-        var note = new TextBlock
         {
-            Text = $"+{hidden} more columns hidden",
-            Foreground = ThemeSubtext, FontSize = 11, Margin = new Thickness(4, 2, 0, 3),
-        };
-        var panel = new DockPanel();
-        DockPanel.SetDock(note, Dock.Top);
-        panel.Children.Add(note);
-        panel.Children.Add(dg);
-        return panel;
+            string head = cols[i];
+            if (hasSchema && schema.TryGetProperty(cols[i], out JsonElement dt) && dt.ValueKind == JsonValueKind.String)
+                head = $"{cols[i]}  {dt.GetString()}";
+            dg.Columns.Add(new DataGridTextColumn { Header = head, Binding = new Binding($"[{i}]") });
+        }
+        return dg;   // row/col counts + "N hidden" now live in the output header (BuildHeader)
     }
 
 }

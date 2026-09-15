@@ -39,7 +39,7 @@ public partial class MainWindow : Window
     // clear every selected node/wire back to its normal look
     private void ClearSelection()
     {
-        foreach (Border b in _selNodes) { b.BorderBrush = Brushes.CadetBlue; b.BoxShadow = default; }
+        foreach (Border b in _selNodes) { b.BorderBrush = b.Tag is NodeInstance n ? BaseBrush(n) : Brushes.CadetBlue; b.BoxShadow = default; }
         foreach (Wire w in _selWires) w.Path.Stroke = WireColor(w);
         foreach (Border bx in _selBoxes)
         {
@@ -55,7 +55,7 @@ public partial class MainWindow : Window
     private void SelectNode(Border box, bool additive)
     {
         if (!additive) ClearSelection();
-        if (additive && _selNodes.Remove(box)) { box.BorderBrush = Brushes.SteelBlue; box.BoxShadow = default; }   // toggle off
+        if (additive && _selNodes.Remove(box)) { box.BorderBrush = box.Tag is NodeInstance n ? BaseBrush(n) : Brushes.SteelBlue; box.BoxShadow = default; }   // toggle off
         else { _selNodes.Add(box); box.BorderBrush = ThemeAccent; box.BoxShadow = SelGlow; }
         SyncPanels();
     }
