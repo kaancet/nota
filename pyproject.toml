@@ -11,6 +11,9 @@ dependencies = [
     "pyarrow>=15",       # polars <-> pandas bridge for the pingouin stats nodes
 ]
 
+[project.scripts]
+nota = "nota.cli:main"
+
 [project.optional-dependencies]
 viz = ["networkx>=3", "matplotlib>=3.7"]
 io = ["fastexcel>=0.10"]   # source.excel
