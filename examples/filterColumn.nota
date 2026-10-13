@@ -1,0 +1,129 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "n2\u2022",
+      "kind": "expr.column",
+      "x": 182.7325541948453,
+      "y": 388.45281946770126,
+      "params": {
+        "name": "id"
+      },
+      "collapsed": false
+    },
+    {
+      "id": "n3\u2022",
+      "kind": "source.csv",
+      "x": 178.234375,
+      "y": 170.765625,
+      "params": {
+        "path": "/Users/kaan/.nota/examples/example.csv",
+        "separator": ",",
+        "has_header": true
+      },
+      "collapsed": false
+    },
+    {
+      "id": "n4\u2022",
+      "kind": "LazyFrame.filter",
+      "x": 643.76171875,
+      "y": 339,
+      "params": {},
+      "collapsed": false
+    },
+    {
+      "id": "n7\u2022",
+      "kind": "sink.preview",
+      "x": 905.6594388453807,
+      "y": 312.5,
+      "params": {
+        "frame": null,
+        "n": 50
+      },
+      "collapsed": false
+    },
+    {
+      "id": "n8\u2022",
+      "kind": "Expr.eq",
+      "x": 404.37369095792843,
+      "y": 389.79830493651866,
+      "params": {
+        "other": 3
+      },
+      "collapsed": false
+    }
+  ],
+  "edges": [
+    {
+      "sourceId": "n3\u2022",
+      "sourceOut": "out",
+      "targetId": "n4\u2022",
+      "targetIn": "self"
+    },
+    {
+      "sourceId": "n4\u2022",
+      "sourceOut": "out",
+      "targetId": "n7\u2022",
+      "targetIn": "frame"
+    },
+    {
+      "sourceId": "n2\u2022",
+      "sourceOut": "out",
+      "targetId": "n8\u2022",
+      "targetIn": "self"
+    },
+    {
+      "sourceId": "n8\u2022",
+      "sourceOut": "out",
+      "targetId": "n4\u2022",
+      "targetIn": "predicates"
+    }
+  ],
+  "boxes": [
+    {
+      "x": 263.63475705694015,
+      "y": 334.172649499379,
+      "w": 230.79184840323092,
+      "h": 90.58278821482384,
+      "name": "Filter a selected column",
+      "colorIdx": 0,
+      "type": "text"
+    },
+    {
+      "x": 211.22456863519062,
+      "y": 135.5214482363798,
+      "w": 322.21421182876367,
+      "h": 40.138018232474096,
+      "name": "Read a CSV file",
+      "colorIdx": 0,
+      "type": "text"
+    },
+    {
+      "x": 868.7977786761494,
+      "y": 257.24051771614165,
+      "w": 262.4708829227874,
+      "h": 64.63323975663326,
+      "name": "Click on the preview to see the filtered data",
+      "colorIdx": 0,
+      "type": "text"
+    },
+    {
+      "x": 286.8265269886364,
+      "y": 352.9616832386364,
+      "w": 228.13671875,
+      "h": 44.73046875,
+      "name": "pl.col(\u0022id\u0022)==3",
+      "colorIdx": 0,
+      "type": "text"
+    },
+    {
+      "x": 620.8148082386364,
+      "y": 305.8093394886364,
+      "w": 360.50390625,
+      "h": 36.20703125,
+      "name": "df.filter(pl.col(\u0022id\u0022)==3)",
+      "colorIdx": 0,
+      "type": "text"
+    }
+  ]
+}

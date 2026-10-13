@@ -314,13 +314,16 @@ public partial class MainWindow : Window
             return crow;
         }
 
+        // a string/any param that names a column -> an AutoCompleteBox fed by the `columns` RPC (4.5)
+        if (WantsColumnComplete(p)) return ColumnRow(node, p, label);
+
         TextBox field = CompactBox(node.Params[p.Name]?.ToString() ?? "");
         field.TextChanged += (_, _) => node.Params[p.Name] = Coerce(field.Text ?? "", p.Type);
         AddEditHistory(field);   // one undo entry per focus session, not per keystroke
 
         // a "path" param gets a Browse… button that opens the OS file picker
         bool isPath = p.Name is "path" or "preset";
-        if (isPath) field.MaxWidth = 300;   // a long path scrolls inside the field, doesn't stretch the node
+        if (isPath) field.MaxWidth = 130;   // cap the field: a long path scrolls inside it, never widens the node
         var row = new Grid { ColumnDefinitions = new ColumnDefinitions(isPath ? "Auto,*,Auto" : "Auto,*") };
         Grid.SetColumn(label, 0);
         Grid.SetColumn(field, 1);
@@ -338,6 +341,68 @@ public partial class MainWindow : Window
             row.Children.Add(browse);
         }
         return row;
+    }
+
+    // params that take free text but are NOT column names -> keep a plain textbox (no column dropdown)
+    private static readonly HashSet<string> _notColumns = new() { "path", "preset", "separator", "sheet_name" };
+
+    // a string/any param with no fixed choices and no special widget is (probably) a column name
+    private static bool WantsColumnComplete(ParamSpec p) =>
+        p.Type is "str" or "any" && p.Choices is null && p.Widget is null && !_notColumns.Contains(p.Name);
+
+    // a column-name field: an AutoCompleteBox whose suggestions come from the `columns` RPC on focus.
+    // ponytail: one RPC per field focus (runs ancestors, plan-only for lazy nodes). Cache per run if slow.
+    private Control ColumnRow(NodeInstance node, ParamSpec p, TextBlock label)
+    {
+        var acb = new AutoCompleteBox
+        {
+            Text = node.Params[p.Name]?.ToString() ?? "",
+            FontSize = 11, MinWidth = 0, MinHeight = 24,   // no fixed Height: forcing it clipped the templated text
+            Background = ThemeField, Foreground = ThemeText,
+            BorderThickness = new Thickness(0), CornerRadius = new CornerRadius(3),
+            FilterMode = AutoCompleteFilterMode.Contains,
+            MinimumPrefixLength = 0,            // empty field -> the whole column list matches
+            IsTextCompletionEnabled = false,    // suggestions only -> free text (a not-yet-existing column, an expr) still allowed
+        };
+        // center + pad the inner editable TextBox so text isn't clipped at a small height
+        acb.Styles.Add(new Style(s => s.OfType<AutoCompleteBox>().Template().OfType<TextBox>())
+        {
+            Setters =
+            {
+                new Setter(TextBox.VerticalContentAlignmentProperty, VerticalAlignment.Center),
+                new Setter(TextBox.PaddingProperty, new Thickness(6, 1)),
+            },
+        });
+        acb.GotFocus += (_, _) =>
+        {
+            var cols = FetchColumns(node);
+            acb.ItemsSource = cols;
+            // post the open: setting it synchronously in GotFocus gets overridden by the control's own focus handling
+            if (cols.Count > 0)
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => acb.IsDropDownOpen = true);
+        };
+        acb.TextChanged += (_, _) => node.Params[p.Name] = Coerce(acb.Text ?? "", p.Type);
+        AddEditHistory(acb, () => acb.Text ?? "");
+
+        var row = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*") };
+        Grid.SetColumn(label, 0);
+        Grid.SetColumn(acb, 1);
+        row.Children.Add(label);
+        row.Children.Add(acb);
+        return row;
+    }
+
+    // ask the backend which columns this node could mean (walks to the frame it feeds); [] on any error
+    private List<string> FetchColumns(NodeInstance node)
+    {
+        try
+        {
+            JsonElement? r = BackendRequest("columns", new { graph = BuildGraphDoc(), node_id = node.Id });
+            if (r is null || !r.Value.TryGetProperty("result", out JsonElement res) || res.ValueKind != JsonValueKind.Array)
+                return new List<string>();
+            return res.EnumerateArray().Select(x => x.GetString() ?? "").Where(s => s.Length > 0).ToList();
+        }
+        catch { return new List<string>(); }
     }
 
     // open the OS file picker and drop the chosen path into the field (async: don't freeze the UI)

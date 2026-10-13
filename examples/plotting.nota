@@ -1,0 +1,170 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "n14\u2022",
+      "kind": "source.csv",
+      "x": 65.34081620674155,
+      "y": 59.18717401803303,
+      "params": {
+        "path": "/Users/kaan/code/nota/examples/example.csv",
+        "separator": ",",
+        "has_header": true
+      },
+      "collapsed": false
+    },
+    {
+      "id": "n16\u2022",
+      "kind": "sink.plot.scatter",
+      "x": 1048.19775390625,
+      "y": 22.2391357421875,
+      "params": {
+        "frame": null,
+        "overrides": null,
+        "figure": null,
+        "x": "id",
+        "y": "value",
+        "preset": ""
+      },
+      "collapsed": false
+    },
+    {
+      "id": "n17\u2022",
+      "kind": "sink.plot.line",
+      "x": 872.8597835449815,
+      "y": 312.7915224890633,
+      "params": {
+        "frame": null,
+        "overrides": null,
+        "figure": null,
+        "x": "id",
+        "y": "value",
+        "preset": ""
+      },
+      "collapsed": false
+    },
+    {
+      "id": "n18\u2022",
+      "kind": "Expr.mean",
+      "x": 214.67001342773438,
+      "y": 496.87750244140625,
+      "params": {},
+      "collapsed": false
+    },
+    {
+      "id": "n19\u2022",
+      "kind": "LazyGroupBy.agg",
+      "x": 627.7515258789062,
+      "y": 310.6993408203125,
+      "params": {},
+      "collapsed": false
+    },
+    {
+      "id": "n20\u2022",
+      "kind": "LazyFrame.group_by",
+      "x": 445.028564453125,
+      "y": 205.53172302246094,
+      "params": {
+        "maintain_order": false
+      },
+      "collapsed": false
+    },
+    {
+      "id": "n21\u2022",
+      "kind": "expr.column",
+      "x": 41.32464599609375,
+      "y": 327.8246154785156,
+      "params": {
+        "name": "id"
+      },
+      "collapsed": false
+    },
+    {
+      "id": "n23\u2022",
+      "kind": "expr.column",
+      "x": 16.29962158203125,
+      "y": 461.37506103515625,
+      "params": {
+        "name": "value"
+      },
+      "collapsed": false
+    },
+    {
+      "id": "n24\u2022",
+      "kind": "LazyFrame.sort",
+      "x": 680.1810302734375,
+      "y": 486.5,
+      "params": {
+        "by": null,
+        "descending": false,
+        "nulls_last": false,
+        "maintain_order": false,
+        "multithreaded": true
+      },
+      "collapsed": false
+    }
+  ],
+  "edges": [
+    {
+      "sourceId": "n21\u2022",
+      "sourceOut": "out",
+      "targetId": "n20\u2022",
+      "targetIn": "by"
+    },
+    {
+      "sourceId": "n14\u2022",
+      "sourceOut": "out",
+      "targetId": "n20\u2022",
+      "targetIn": "self"
+    },
+    {
+      "sourceId": "n20\u2022",
+      "sourceOut": "out",
+      "targetId": "n19\u2022",
+      "targetIn": "self"
+    },
+    {
+      "sourceId": "n17\u2022",
+      "sourceOut": "out",
+      "targetId": "n16\u2022",
+      "targetIn": "figure"
+    },
+    {
+      "sourceId": "n14\u2022",
+      "sourceOut": "out",
+      "targetId": "n16\u2022",
+      "targetIn": "frame"
+    },
+    {
+      "sourceId": "n23\u2022",
+      "sourceOut": "out",
+      "targetId": "n18\u2022",
+      "targetIn": "self"
+    },
+    {
+      "sourceId": "n18\u2022",
+      "sourceOut": "out",
+      "targetId": "n19\u2022",
+      "targetIn": "aggs"
+    },
+    {
+      "sourceId": "n19\u2022",
+      "sourceOut": "out",
+      "targetId": "n24\u2022",
+      "targetIn": "self"
+    },
+    {
+      "sourceId": "n24\u2022",
+      "sourceOut": "out",
+      "targetId": "n17\u2022",
+      "targetIn": "frame"
+    },
+    {
+      "sourceId": "n21\u2022",
+      "sourceOut": "out",
+      "targetId": "n24\u2022",
+      "targetIn": "by"
+    }
+  ],
+  "boxes": []
+}

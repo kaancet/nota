@@ -3,6 +3,7 @@ until a sink collects. Existence is checked up front for an immediate error inst
 of a confusing failure deep inside a later collect.
 """
 
+import json
 from pathlib import Path
 
 import polars as pl
@@ -55,6 +56,12 @@ def read_excel(path: str, *, sheet_name: str = "") -> pl.LazyFrame:
     """Read an Excel sheet (eager -> .lazy()). Needs the 'fastexcel' extra."""
     df = pl.read_excel(_require(path), sheet_name=sheet_name or None)
     return df.lazy()
+
+
+@node("source.json", "Source")
+def read_json(path: str) -> object:
+    """Read a JSON file into a Python value (dict, list, etc.). Wire into any dict/kwargs port."""
+    return json.loads(Path(_require(path)).read_text())
 
 
 _BY_EXT = {

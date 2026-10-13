@@ -1,0 +1,176 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "n0\u2022",
+      "kind": "source.csv",
+      "x": 17.50312499999984,
+      "y": 83.81914062500002,
+      "params": {
+        "path": "/Users/kaan/.nota/examples/example.csv",
+        "separator": ",",
+        "has_header": true
+      },
+      "collapsed": false
+    },
+    {
+      "id": "n1\u2022",
+      "kind": "LazyFrame.with_columns",
+      "x": 483.2644578080449,
+      "y": 108.61480654885094,
+      "params": {},
+      "collapsed": false
+    },
+    {
+      "id": "n2\u2022",
+      "kind": "Expr.alias",
+      "x": 545.5538033199313,
+      "y": 431.0422491307579,
+      "params": {
+        "name": "value2"
+      },
+      "collapsed": false
+    },
+    {
+      "id": "n4\u2022",
+      "kind": "expr.column",
+      "x": 10.710384505543118,
+      "y": 277.4552017625802,
+      "params": {
+        "name": "value"
+      },
+      "collapsed": false
+    },
+    {
+      "id": "n5\u2022",
+      "kind": "Expr.mul",
+      "x": 392.3780840227972,
+      "y": 333.00887828723756,
+      "params": {
+        "other": 10
+      },
+      "collapsed": false
+    },
+    {
+      "id": "n7\u2022",
+      "kind": "Expr.add",
+      "x": 205.72876713046048,
+      "y": 315.6383253559686,
+      "params": {
+        "other": 5
+      },
+      "collapsed": false
+    },
+    {
+      "id": "n8\u2022",
+      "kind": "pg.ttest",
+      "x": 817.2234960937502,
+      "y": -51.74760156250005,
+      "params": {
+        "x": "value",
+        "y": "value2",
+        "paired": false,
+        "alternative": "two-sided",
+        "correction": "auto",
+        "r": 0.707,
+        "confidence": 0.95
+      },
+      "collapsed": false
+    },
+    {
+      "id": "n9\u2022",
+      "kind": "pg.corr",
+      "x": 820.0930273437501,
+      "y": 231.4965390625,
+      "params": {
+        "x": "value",
+        "y": "value2",
+        "alternative": "two-sided",
+        "method": "pearson"
+      },
+      "collapsed": false
+    },
+    {
+      "id": "n10\u2022",
+      "kind": "pg.wilcoxon",
+      "x": 820.3700742187501,
+      "y": 435.2390078124999,
+      "params": {
+        "x": "value",
+        "y": "value2",
+        "alternative": "two-sided"
+      },
+      "collapsed": false
+    }
+  ],
+  "edges": [
+    {
+      "sourceId": "n4\u2022",
+      "sourceOut": "out",
+      "targetId": "n7\u2022",
+      "targetIn": "self"
+    },
+    {
+      "sourceId": "n7\u2022",
+      "sourceOut": "out",
+      "targetId": "n5\u2022",
+      "targetIn": "self"
+    },
+    {
+      "sourceId": "n5\u2022",
+      "sourceOut": "out",
+      "targetId": "n2\u2022",
+      "targetIn": "self"
+    },
+    {
+      "sourceId": "n2\u2022",
+      "sourceOut": "out",
+      "targetId": "n1\u2022",
+      "targetIn": "exprs"
+    },
+    {
+      "sourceId": "n0\u2022",
+      "sourceOut": "out",
+      "targetId": "n1\u2022",
+      "targetIn": "self"
+    },
+    {
+      "sourceId": "n1\u2022",
+      "sourceOut": "out",
+      "targetId": "n8\u2022",
+      "targetIn": "data"
+    },
+    {
+      "sourceId": "n1\u2022",
+      "sourceOut": "out",
+      "targetId": "n9\u2022",
+      "targetIn": "data"
+    },
+    {
+      "sourceId": "n1\u2022",
+      "sourceOut": "out",
+      "targetId": "n10\u2022",
+      "targetIn": "data"
+    }
+  ],
+  "boxes": [
+    {
+      "x": 43.37384311444987,
+      "y": 51.579161830285,
+      "w": 290.40312863903756,
+      "h": 82.54605111415393,
+      "name": "Read the CSV file",
+      "colorIdx": 0,
+      "type": "text"
+    },
+    {
+      "x": 139.0282860932325,
+      "y": 234.33437289303694,
+      "w": 343.2002197793445,
+      "h": 55.78474709715934,
+      "name": "Adding a new column, get\u0027s executed through \u0022With columns\u0022 node",
+      "colorIdx": 0,
+      "type": "text"
+    }
+  ]
+}

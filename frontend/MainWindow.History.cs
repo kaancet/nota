@@ -70,14 +70,17 @@ public partial class MainWindow : Window
 
     // a param text/code box: capture on focus, push one undo entry on blur only if the text changed
     // (so a whole edit session is a single undo, not one per keystroke)
-    private void AddEditHistory(TextBox field)
+    private void AddEditHistory(TextBox field) => AddEditHistory(field, () => field.Text ?? "");
+
+    // general form: any control, reading its text through `getText` (used by the AutoCompleteBox in 4.5)
+    private void AddEditHistory(Control field, Func<string> getText)
     {
         string? snap = null;
         string start = "";
-        field.GotFocus += (_, _) => { snap = SerializeGraph(); start = field.Text ?? ""; };
+        field.GotFocus += (_, _) => { snap = SerializeGraph(); start = getText(); };
         field.LostFocus += (_, _) =>
         {
-            if (snap is not null && (field.Text ?? "") != start) PushUndo(snap);
+            if (snap is not null && getText() != start) PushUndo(snap);
             snap = null;
         };
     }

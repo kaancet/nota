@@ -1,0 +1,132 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "n3\u2022",
+      "kind": "LazyGroupBy.agg",
+      "x": 765.7524599509719,
+      "y": 195.16787760189263,
+      "params": {},
+      "collapsed": false
+    },
+    {
+      "id": "n4\u2022",
+      "kind": "LazyFrame.group_by",
+      "x": 472.2681493461871,
+      "y": 119.46863517664585,
+      "params": {
+        "maintain_order": false
+      },
+      "collapsed": false
+    },
+    {
+      "id": "n5\u2022",
+      "kind": "expr.column",
+      "x": 150.336096853766,
+      "y": 355.75471039982483,
+      "params": {
+        "name": "id"
+      },
+      "collapsed": false
+    },
+    {
+      "id": "n9\u2022",
+      "kind": "Expr.mean",
+      "x": 597.5967739510038,
+      "y": 304.5250743822617,
+      "params": {},
+      "collapsed": false
+    },
+    {
+      "id": "n11\u2022",
+      "kind": "expr.column",
+      "x": 414.4993346063401,
+      "y": 266.5350989782159,
+      "params": {
+        "name": "value"
+      },
+      "collapsed": false
+    },
+    {
+      "id": "n12\u2022",
+      "kind": "source.csv",
+      "x": 86.93201274059254,
+      "y": 56.7067107349703,
+      "params": {
+        "path": "/Users/kaan/.nota/examples/example.csv",
+        "separator": ",",
+        "has_header": true
+      },
+      "collapsed": false
+    },
+    {
+      "id": "n13\u2022",
+      "kind": "LazyFrame.sort",
+      "x": 943.2772940324368,
+      "y": 170.45616352209592,
+      "params": {
+        "by": null,
+        "descending": false,
+        "nulls_last": false,
+        "maintain_order": false,
+        "multithreaded": true
+      },
+      "collapsed": false
+    }
+  ],
+  "edges": [
+    {
+      "sourceId": "n5\u2022",
+      "sourceOut": "out",
+      "targetId": "n4\u2022",
+      "targetIn": "by"
+    },
+    {
+      "sourceId": "n4\u2022",
+      "sourceOut": "out",
+      "targetId": "n3\u2022",
+      "targetIn": "self"
+    },
+    {
+      "sourceId": "n9\u2022",
+      "sourceOut": "out",
+      "targetId": "n3\u2022",
+      "targetIn": "aggs"
+    },
+    {
+      "sourceId": "n11\u2022",
+      "sourceOut": "out",
+      "targetId": "n9\u2022",
+      "targetIn": "self"
+    },
+    {
+      "sourceId": "n12\u2022",
+      "sourceOut": "out",
+      "targetId": "n4\u2022",
+      "targetIn": "self"
+    },
+    {
+      "sourceId": "n3\u2022",
+      "sourceOut": "out",
+      "targetId": "n13\u2022",
+      "targetIn": "self"
+    },
+    {
+      "sourceId": "n5\u2022",
+      "sourceOut": "out",
+      "targetId": "n13\u2022",
+      "targetIn": "by"
+    }
+  ],
+  "boxes": [
+    {
+      "x": 125.42607424785308,
+      "y": 18.846007272799056,
+      "w": 347.70477688765436,
+      "h": 60.64508767594327,
+      "name": "Read CSV",
+      "colorIdx": 0,
+      "type": "text"
+    }
+  ]
+}

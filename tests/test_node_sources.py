@@ -1,10 +1,12 @@
 """Behavioral tests for the source.* builtin nodes."""
 
+import json
+
 import polars as pl
 import pytest
 from helpers import covers, preview_of
 
-from nota.core import Graph
+from nota.core import Graph, run
 
 DF = pl.DataFrame({"g": ["a", "b"], "v": [1, 2]})
 ROWS = [["a", 1], ["b", 2]]
@@ -70,6 +72,19 @@ def test_sample():
     out = preview_of(g)
     assert out["columns"] == ["id", "name", "score"]
     assert out["shape"][0] == 5
+
+
+@covers("source.json")
+def test_json(tmp_path):
+    f = tmp_path / "x.json"
+    f.write_text(json.dumps({"a": 1, "b": [2, 3]}))
+    g = Graph().add("src", "source.json", {"path": str(f)})
+    assert run(g)["src"] == {"a": 1, "b": [2, 3]}
+    # top-level array comes back as a list, unchanged
+    f2 = tmp_path / "arr.json"
+    f2.write_text(json.dumps([1, 2, 3]))
+    g2 = Graph().add("src", "source.json", {"path": str(f2)})
+    assert run(g2)["src"] == [1, 2, 3]
 
 
 def test_missing_file_raises_early(tmp_path):
