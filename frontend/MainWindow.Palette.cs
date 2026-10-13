@@ -417,14 +417,20 @@ public partial class MainWindow : Window
     }
 
     private void OnCanvasDragOver(object? sender, DragEventArgs e) =>
-        e.DragEffects = e.DataTransfer.Contains(NodeKindFormat) ? DragDropEffects.Copy : DragDropEffects.None;
+        e.DragEffects = e.DataTransfer.Contains(NodeKindFormat) || e.DataTransfer.Contains(DataFormat.File)
+            ? DragDropEffects.Copy : DragDropEffects.None;
 
     private void OnCanvasDrop(object? sender, DragEventArgs e)
     {
+        Point w = e.GetPosition(NodeCanvas);   // world space (through zoom/pan), like a marquee anchor
+        if (e.DataTransfer.TryGetFiles() is { } dropped)   // files from Finder/Explorer -> data-first entry
+        {
+            OpenDataFiles(dropped.Select(f => f.Path.LocalPath), w.X, w.Y);
+            return;
+        }
         if (e.DataTransfer.TryGetValue(NodeKindFormat) is not string kind) return;
         NodeType? type = _allTypes.FirstOrDefault(x => x.Kind == kind);
         if (type is null) return;
-        Point w = e.GetPosition(NodeCanvas);   // world space (through zoom/pan), like a marquee anchor
         Snapshot();
         AddNode(type, w.X, w.Y, $"n{_nextId++}•");
         PushRecent(type.Kind);

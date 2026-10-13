@@ -16,6 +16,7 @@
                     <NativeMenu>
                         <NativeMenuItem Header="Save…" Gesture="Cmd+S" Click="OnSave"/>
                         <NativeMenuItem Header="Load…" Gesture="Cmd+O" Click="OnLoad"/>
+                        <NativeMenuItem Header="Open Data File…" Gesture="Cmd+Shift+O" Click="OnOpenDataFile"/>
                         <NativeMenuItem Header="Load Example…" Click="OnLoadExample"/>
                     </NativeMenu>
                 </NativeMenuItem.Menu>
@@ -100,7 +101,7 @@
                     <TextBlock x:Name="EmptyHint" IsHitTestVisible="False"
                                HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
                                Foreground="{DynamicResource NotaSubtext}" FontSize="13"
-                               Text="Drag a node from the palette&#x0a;Shift+A to search · File › Load Example"/>
+                               Text="Drag a node from the palette&#x0a;Shift+A to search · File › Load Example&#x0a;&#x0a;OR&#x0a;&#x0a;Start by dragging a file (File &gt; Open Data File...)"/>
                 </Grid>
             </Border>
             <GridSplitter Grid.Row="1" Background="{DynamicResource NotaSplitter}" HorizontalAlignment="Stretch"/>

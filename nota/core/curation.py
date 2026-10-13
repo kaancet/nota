@@ -14,9 +14,22 @@ from __future__ import annotations
 
 # substrings that mark a method as not-graph-useful (converters, escape hatches, internals)
 _HIDE_SUBSTR = (
-    "to_pandas", "to_numpy", "to_arrow", "to_torch", "to_jax", "to_dict", "to_init_repr",
-    "map_elements", "map_batches", "map_groups", "serialize", "deserialize",
-    "show_graph", "profile", "sink_", "write_",  # write_* covered by sink.* nodes
+    "to_pandas",
+    "to_numpy",
+    "to_arrow",
+    "to_torch",
+    "to_jax",
+    "to_dict",
+    "to_init_repr",
+    "map_elements",
+    "map_batches",
+    "map_groups",
+    "serialize",
+    "deserialize",
+    "show_graph",
+    "LazyFrame.profile",
+    "sink_",
+    "write_",  # write_* covered by sink.* nodes
 )
 
 
@@ -35,56 +48,92 @@ def hidden(kind: str) -> bool:
 COMMON: dict[str, tuple[str, str]] = {
     # Source / Column / Literal
     "source.sample": ("Source", "Sample data"),
-    "source.csv": ("Source", "Read CSV"), "source.parquet": ("Source", "Read Parquet"),
+    "source.csv": ("Source", "Read CSV"),
+    "source.parquet": ("Source", "Read Parquet"),
     "source.auto": ("Source", "Read File"),
-    "expr.column": ("Column", "Column"), "expr.columns": ("Column", "Columns"),
-    "expr.col_regex": ("Column", "Columns by regex"), "expr.col_dtype": ("Column", "Columns by type"),
+    "stats.profile": ("Statistics", "Profile Data"),
+    "expr.column": ("Column", "Column"),
+    "expr.columns": ("Column", "Columns"),
+    "expr.col_regex": ("Column", "Columns by regex"),
+    "expr.col_dtype": ("Column", "Columns by type"),
     "expr.lit": ("Literal", "Constant"),
-    "expr.const_int": ("Literal", "Integer"), "expr.const_float": ("Literal", "Float"),
+    "expr.const_int": ("Literal", "Integer"),
+    "expr.const_float": ("Literal", "Float"),
     "expr.const_str": ("Literal", "String"),
     # Transform (LazyFrame)
-    "LazyFrame.filter": ("Transform", "Filter"), "LazyFrame.select": ("Transform", "Select"),
-    "LazyFrame.with_columns": ("Transform", "With columns"), "LazyFrame.drop": ("Transform", "Drop"),
-    "LazyFrame.rename": ("Transform", "Rename"), "LazyFrame.sort": ("Transform", "Sort"),
-    "LazyFrame.unique": ("Transform", "Unique"), "LazyFrame.head": ("Transform", "Head"),
-    "LazyFrame.drop_nulls": ("Transform", "Drop nulls"), "LazyFrame.fill_null": ("Transform", "Fill nulls"),
-    "LazyFrame.join": ("Transform", "Join"), "LazyFrame.group_by": ("Transform", "Group by"),
+    "LazyFrame.filter": ("Transform", "Filter"),
+    "LazyFrame.select": ("Transform", "Select"),
+    "LazyFrame.with_columns": ("Transform", "With columns"),
+    "LazyFrame.drop": ("Transform", "Drop"),
+    "LazyFrame.rename": ("Transform", "Rename"),
+    "LazyFrame.sort": ("Transform", "Sort"),
+    "LazyFrame.unique": ("Transform", "Unique"),
+    "LazyFrame.head": ("Transform", "Head"),
+    "LazyFrame.drop_nulls": ("Transform", "Drop nulls"),
+    "LazyFrame.fill_null": ("Transform", "Fill nulls"),
+    "LazyFrame.join": ("Transform", "Join"),
+    "LazyFrame.group_by": ("Transform", "Group by"),
     # Aggregate
     "LazyGroupBy.agg": ("Aggregate", "Aggregate"),
-    "Expr.sum": ("Aggregate", "Sum"), "Expr.mean": ("Aggregate", "Mean"),
-    "Expr.min": ("Aggregate", "Min"), "Expr.max": ("Aggregate", "Max"),
-    "Expr.count": ("Aggregate", "Count"), "Expr.n_unique": ("Aggregate", "N unique"),
-    "Expr.median": ("Aggregate", "Median"), "Expr.std": ("Aggregate", "Std"),
-    "Expr.first": ("Aggregate", "First"), "Expr.last": ("Aggregate", "Last"),
+    "Expr.sum": ("Aggregate", "Sum"),
+    "Expr.mean": ("Aggregate", "Mean"),
+    "Expr.min": ("Aggregate", "Min"),
+    "Expr.max": ("Aggregate", "Max"),
+    "Expr.count": ("Aggregate", "Count"),
+    "Expr.n_unique": ("Aggregate", "N unique"),
+    "Expr.median": ("Aggregate", "Median"),
+    "Expr.std": ("Aggregate", "Std"),
+    "Expr.first": ("Aggregate", "First"),
+    "Expr.last": ("Aggregate", "Last"),
     # Expression
-    "Expr.alias": ("Expression", "Alias"), "Expr.cast": ("Expression", "Cast"),
-    "Expr.round": ("Expression", "Round"), "Expr.abs": ("Expression", "Abs"),
-    "Expr.fill_null": ("Expression", "Fill null"), "Expr.is_null": ("Expression", "Is null"),
+    "Expr.alias": ("Expression", "Alias"),
+    "Expr.cast": ("Expression", "Cast"),
+    "Expr.round": ("Expression", "Round"),
+    "Expr.abs": ("Expression", "Abs"),
+    "Expr.fill_null": ("Expression", "Fill null"),
+    "Expr.is_null": ("Expression", "Is null"),
     "Expr.over": ("Expression", "Over (window)"),
     # Compare / Logic
-    "Expr.gt": ("Compare", ">"), "Expr.lt": ("Compare", "<"),
-    "Expr.ge": ("Compare", ">="), "Expr.le": ("Compare", "<="),
-    "Expr.eq": ("Compare", "=="), "Expr.ne": ("Compare", "!="),
-    "Expr.and_": ("Logic", "AND"), "Expr.or_": ("Logic", "OR"), "Expr.not_": ("Logic", "NOT"),
-    "Expr.is_in": ("Logic", "Is in"), "Expr.is_between": ("Logic", "Is between"),
+    "Expr.gt": ("Compare", ">"),
+    "Expr.lt": ("Compare", "<"),
+    "Expr.ge": ("Compare", ">="),
+    "Expr.le": ("Compare", "<="),
+    "Expr.eq": ("Compare", "=="),
+    "Expr.ne": ("Compare", "!="),
+    "Expr.and_": ("Logic", "AND"),
+    "Expr.or_": ("Logic", "OR"),
+    "Expr.not_": ("Logic", "NOT"),
+    "Expr.is_in": ("Logic", "Is in"),
+    "Expr.is_between": ("Logic", "Is between"),
     # String / Date / List
-    "Expr.str.contains": ("String", "Contains"), "Expr.str.split": ("String", "Split"),
-    "Expr.str.replace": ("String", "Replace"), "Expr.str.to_uppercase": ("String", "Uppercase"),
-    "Expr.str.to_lowercase": ("String", "Lowercase"), "Expr.str.len_chars": ("String", "Length"),
+    "Expr.str.contains": ("String", "Contains"),
+    "Expr.str.split": ("String", "Split"),
+    "Expr.str.replace": ("String", "Replace"),
+    "Expr.str.to_uppercase": ("String", "Uppercase"),
+    "Expr.str.to_lowercase": ("String", "Lowercase"),
+    "Expr.str.len_chars": ("String", "Length"),
     "Expr.str.strip_chars": ("String", "Strip"),
-    "Expr.dt.year": ("Date", "Year"), "Expr.dt.month": ("Date", "Month"),
-    "Expr.dt.day": ("Date", "Day"), "Expr.dt.weekday": ("Date", "Weekday"),
-    "Expr.list.len": ("List", "List length"), "Expr.list.sum": ("List", "List sum"),
+    "Expr.dt.year": ("Date", "Year"),
+    "Expr.dt.month": ("Date", "Month"),
+    "Expr.dt.day": ("Date", "Day"),
+    "Expr.dt.weekday": ("Date", "Weekday"),
+    "Expr.list.len": ("List", "List length"),
+    "Expr.list.sum": ("List", "List sum"),
     "Expr.list.get": ("List", "List get"),
     # Sink
-    "sink.preview": ("Sink", "Preview"), "sink.write_csv": ("Sink", "Write CSV"),
+    "sink.preview": ("Sink", "Preview"),
+    "sink.write_csv": ("Sink", "Write CSV"),
     "sink.write_parquet": ("Sink", "Write Parquet"),
     # Plot (interactive bokeh via behaviz)
-    "sink.plot.line": ("Plot", "Line plot"), "sink.plot.scatter": ("Plot", "Scatter plot"),
-    "sink.plot.bar": ("Plot", "Bar plot"), "sink.plot.step": ("Plot", "Step plot"),
-    "sink.plot.hist": ("Plot", "Histogram"), "sink.plot.hbar": ("Plot", "Horizontal bar"),
+    "sink.plot.line": ("Plot", "Line plot"),
+    "sink.plot.scatter": ("Plot", "Scatter plot"),
+    "sink.plot.bar": ("Plot", "Bar plot"),
+    "sink.plot.step": ("Plot", "Step plot"),
+    "sink.plot.hist": ("Plot", "Histogram"),
+    "sink.plot.hbar": ("Plot", "Horizontal bar"),
     # Code (write the expression instead of wiring it)
-    "expr.sql": ("Expression", "SQL expression"), "transform.sql": ("Transform", "SQL query"),
+    "expr.sql": ("Expression", "SQL expression"),
+    "transform.sql": ("Transform", "SQL query"),
     "transform.python": ("Transform", "Python"),
     # Dict
     "dict.build": ("Dict", "Dict builder"),
@@ -95,7 +144,7 @@ COMMON: dict[str, tuple[str, str]] = {
 # plain textbox. Injected onto the manifest entry; the frontend renders accordingly.
 WIDGETS: dict[str, dict[str, str]] = {
     "dict.build": {"entries": "kvlist"},  # a dynamic key/value row editor
-    "transform.sql": {"query": "code"},   # multiline code editor
+    "transform.sql": {"query": "code"},  # multiline code editor
     "transform.python": {"code": "code"},
     "expr.sql": {"expression": "code"},
 }
@@ -120,6 +169,7 @@ ALIASES: dict[str, list[str]] = {
     "Expr.alias": ["rename", "as"],
     "Expr.is_in": ["one of", "in list"],
     "expr.column": ["col", "field"],
+    "stats.profile": ["summary", "overview", "missing values", "data quality", "dtypes", "info"],
     "sink.preview": ["show", "table", "view"],
     "sink.write_csv": ["export", "save csv"],
     "source.csv": ["load", "open", "import csv"],
@@ -128,8 +178,8 @@ ALIASES: dict[str, list[str]] = {
 
 def _default_category(kind: str) -> str:
     if kind.count(".") >= 2 and kind.startswith("Expr."):
-        return "Expr." + kind.split(".")[1]      # namespace: Expr.str, Expr.dt, ...
-    return kind.split(".")[0]                     # Expr, LazyFrame, pl, source, sink, ...
+        return "Expr." + kind.split(".")[1]  # namespace: Expr.str, Expr.dt, ...
+    return kind.split(".")[0]  # Expr, LazyFrame, pl, source, sink, ...
 
 
 def decorate(entry: dict) -> dict | None:
@@ -137,12 +187,12 @@ def decorate(entry: dict) -> dict | None:
     kind = entry["kind"]
     if hidden(kind):
         return None
-    if kind.startswith("composite."):        # user-generated macro node: keep public()'s label/category
+    if kind.startswith("composite."):  # user-generated macro node: keep public()'s label/category
         entry.setdefault("category", "User generated")
         entry.setdefault("label", kind.split(".")[-1].replace("_", " "))
         entry["tier"] = "common"
         return entry
-    if kind.startswith("pg."):               # reflected pingouin stats node
+    if kind.startswith("pg."):  # reflected pingouin stats node
         entry["category"] = "Stats"
         entry["label"] = kind.split(".")[-1].replace("_", " ")
         entry["tier"] = "common"

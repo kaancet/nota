@@ -85,6 +85,12 @@ public partial class MainWindow : Window
     {
         NodeInstance? only = SoleNode();
         if (only is null) { StatusText.Text = "select one node to run to"; return; }
+        RunToNode(only);
+    }
+
+    // run `only` and its ancestors via preview; shows just that node's result. Also used by data-file open.
+    private void RunToNode(NodeInstance only)
+    {
         try
         {
             JsonElement? rr = BackendRequest("preview", new { graph = BuildGraphDoc(), node_id = only.Id });
