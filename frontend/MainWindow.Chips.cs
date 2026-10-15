@@ -234,7 +234,9 @@ public partial class MainWindow : Window
             List<KeyValuePair<string, string>> cols = FetchInputSchema(node);
             List<string> left = cols.Select(c => c.Key).Where(n => chips.All(c => c.Name != n)).ToList();
             add.ItemsSource = left;
-            add.PlaceholderText = cols.Count == 0 ? "connect a table to see its columns" : multi ? "+ add column" : "choose column";
+            add.PlaceholderText = cols.Count > 0 ? (multi ? "+ add column" : "choose column")
+                : HasFrameInput(node) ? "connect a table to see its columns"
+                : "wire this into a node that has a table to see its columns";   // expression nodes take no table themselves
             if (left.Count > 0)   // post the open: setting it inside GotFocus is overridden by the control's own focus handling
                 Avalonia.Threading.Dispatcher.UIThread.Post(() => add.IsDropDownOpen = true);
         };
@@ -260,6 +262,44 @@ public partial class MainWindow : Window
         _chipViews[(node.Id, p.Name)] = Render;
         Render();
         return new StackPanel { Spacing = 2, Margin = new Thickness(0, 2, 0, 2), Children = { label, grid, add } };
+    }
+
+    // --- refresh when wiring changes: a Column node wired into a Filter sees its table right away ---
+
+    private bool _suspendChipRefresh;   // true during load / paste / delete cascades (wires are added in bulk)
+
+    private void WithoutChipRefresh(Action bulk)
+    {
+        bool was = _suspendChipRefresh;
+        _suspendChipRefresh = true;
+        try { bulk(); } finally { _suspendChipRefresh = was; }
+    }
+
+    // A wire into `targetId` was added or removed. Affected chip nodes: the target itself and the
+    // expression chain feeding it (edges into non-frame ports) -- upstream tables are unchanged.
+    private void RefreshChipsAfterWire(string targetId)
+    {
+        if (_suspendChipRefresh) return;
+        var affected = new HashSet<string> { targetId };
+        var stack = new Stack<string>();
+        stack.Push(targetId);
+        while (stack.Count > 0)
+        {
+            string id = stack.Pop();
+            NodeInstance? n = _nodes.FirstOrDefault(x => x.Id == id);
+            if (n is null) continue;
+            foreach (Edge e in _edges.Where(e => e.TargetId == id))
+            {
+                bool frameIn = n.Type.Inputs.Any(i => i.Name == e.TargetIn && i.Type == "frame");
+                if (!frameIn && affected.Add(e.SourceId)) stack.Push(e.SourceId);
+            }
+        }
+        foreach (NodeInstance n in _nodes.Where(n => affected.Contains(n.Id) && n.Type.Params.Any(IsChipWidget)).ToList())
+            if (FetchInputSchema(n).Count == 0)
+            {
+                _colTypes.Remove(n.Id);   // disconnected: forget the types, chips go neutral
+                RepaintChips(n.Id);
+            }
     }
 
     // --- dtype refresh after a Run: the payloads already carry each table's schema ---

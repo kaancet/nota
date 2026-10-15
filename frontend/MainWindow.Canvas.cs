@@ -517,14 +517,18 @@ public partial class MainWindow : Window
         _edges.RemoveAll(edge => edge.SourceId == src.Node.Id && edge.SourceOut == src.Port.Name
                               && edge.TargetId == tgt.Node.Id && edge.TargetIn == tgt.Port.Name);
         _selWires.Remove(w);
+        RefreshChipsAfterWire(tgt.Node.Id);
     }
 
     private void RemoveNode(Border box)
     {
         if (box.Tag is not NodeInstance node) return;
         // cascade: delete every wire touching this node (as source or target)
-        foreach (Wire w in _wires.Where(w => DotNode(w.From) == node || DotNode(w.To) == node).ToList())
-            RemoveWire(w);
+        WithoutChipRefresh(() =>
+        {
+            foreach (Wire w in _wires.Where(w => DotNode(w.From) == node || DotNode(w.To) == node).ToList())
+                RemoveWire(w);
+        });
         NodeCanvas.Children.Remove(box);
         _nodes.Remove(node);
         _selNodes.Remove(box);

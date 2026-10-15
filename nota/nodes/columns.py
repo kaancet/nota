@@ -14,6 +14,8 @@ from nota.core.registry import node
 @node("expr.column", "Column")
 def column(name: str) -> pl.Expr:
     """One column by name (frontend fills a dropdown from the frame schema)."""
+    if not (name or "").strip():
+        raise ValueError("Column: pick a column")
     return pl.col(name)
 
 
@@ -22,6 +24,8 @@ def columns(names: list) -> pl.Expr:
     """Several columns by name (multi-select)."""
     if isinstance(names, str):
         names = [s.strip() for s in names.split(",") if s.strip()]
+    if not names:
+        raise ValueError("Columns: pick at least one column")
     return pl.col(*names)
 
 

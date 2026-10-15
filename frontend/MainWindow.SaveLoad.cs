@@ -165,14 +165,17 @@ public partial class MainWindow : Window
 
         // dots only have real canvas positions after a layout pass -> force one before wiring
         NodeCanvas.UpdateLayout();
-        foreach (SavedEdge se in doc.edges)
+        WithoutChipRefresh(() =>
         {
-            if (!byId.TryGetValue(se.sourceId, out NodeInstance? s) || !byId.TryGetValue(se.targetId, out NodeInstance? t))
-                continue;
-            Shape? from = FindDot(s, se.sourceOut, isInput: false);
-            Shape? to = FindDot(t, se.targetIn, isInput: true);
-            if (from is not null && to is not null) AddWire(from, to);
-        }
+            foreach (SavedEdge se in doc.edges)
+            {
+                if (!byId.TryGetValue(se.sourceId, out NodeInstance? s) || !byId.TryGetValue(se.targetId, out NodeInstance? t))
+                    continue;
+                Shape? from = FindDot(s, se.sourceOut, isInput: false);
+                Shape? to = FindDot(t, se.targetIn, isInput: true);
+                if (from is not null && to is not null) AddWire(from, to);
+            }
+        });
         foreach (SavedBox sb in doc.boxes ?? Enumerable.Empty<SavedBox>())
         {
             if (sb.type == "text")

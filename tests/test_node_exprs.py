@@ -79,3 +79,24 @@ def test_columns_accepts_comma_string():
     """H1: expr.columns accepts 'g, v' string from the GUI."""
     cols = _select("expr.columns", {"names": "g, v"})
     assert cols == ["g", "v"]
+
+
+def test_column_nodes_friendly_errors():
+    import pytest
+
+    from nota.nodes.columns import column, columns
+
+    with pytest.raises(ValueError, match="pick a column"):
+        column("")
+    with pytest.raises(ValueError, match="at least one column"):
+        columns("")
+    with pytest.raises(ValueError, match="at least one column"):
+        columns(None)
+
+
+def test_column_nodes_use_the_chip_widgets():
+    from nota.core import manifest
+
+    m = {e["kind"]: e for e in manifest("all")}
+    assert next(p for p in m["expr.column"]["params"] if p["name"] == "name")["widget"] == "column"
+    assert next(p for p in m["expr.columns"]["params"] if p["name"] == "names")["widget"] == "columns"

@@ -107,8 +107,11 @@ public partial class MainWindow : Window
         var tgt = (PortRef)toDot.Tag!;
         // non-variadic input: last wire wins -> drop any existing wire into the same port
         if (!tgt.Port.Variadic)
-            foreach (Wire existing in _wires.Where(w => SamePort((PortRef)w.To.Tag!, tgt)).ToList())
-                RemoveWire(existing);
+            WithoutChipRefresh(() =>
+            {
+                foreach (Wire existing in _wires.Where(w => SamePort((PortRef)w.To.Tag!, tgt)).ToList())
+                    RemoveWire(existing);
+            });
 
         var path = new Path
         {
@@ -126,6 +129,7 @@ public partial class MainWindow : Window
             FromOffset = LocalOffset(fromDot),
             ToOffset = LocalOffset(toDot),
         });
+        RefreshChipsAfterWire(tgt.Node.Id);   // column chips pick up (or lose) their table right away
     }
 
     // --- failed-node highlighting (#1.15) ---

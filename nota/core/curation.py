@@ -176,6 +176,7 @@ WIDGETS: dict[str, dict[str, str]] = {
     "simple.long_to_wide": {"index": "columns", "names_from": "column", "values_from": "column"},
     "simple.join": {"on": "columns"},
     "expr.column": {"name": "column"},
+    "expr.columns": {"names": "columns"},
 }
 
 

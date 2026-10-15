@@ -133,14 +133,17 @@ public partial class MainWindow : Window
             map[sn.id] = AddNode(type, sn.x + 40, sn.y + 40, newId, sn.@params, sn.collapsed);
         }
         NodeCanvas.UpdateLayout();                           // dots need a layout pass before wiring
-        foreach (SavedEdge se in clip.edges)
+        WithoutChipRefresh(() =>
         {
-            if (!map.TryGetValue(se.sourceId, out NodeInstance? s) || !map.TryGetValue(se.targetId, out NodeInstance? t))
-                continue;
-            Shape? from = FindDot(s, se.sourceOut, isInput: false);
-            Shape? to = FindDot(t, se.targetIn, isInput: true);
-            if (from is not null && to is not null) AddWire(from, to);
-        }
+            foreach (SavedEdge se in clip.edges)
+            {
+                if (!map.TryGetValue(se.sourceId, out NodeInstance? s) || !map.TryGetValue(se.targetId, out NodeInstance? t))
+                    continue;
+                Shape? from = FindDot(s, se.sourceOut, isInput: false);
+                Shape? to = FindDot(t, se.targetIn, isInput: true);
+                if (from is not null && to is not null) AddWire(from, to);
+            }
+        });
         ClearSelection();                                    // select the pasted nodes
         foreach (NodeInstance n in map.Values)
             if (NodeBox(n) is Border box) SelectNode(box, additive: true);

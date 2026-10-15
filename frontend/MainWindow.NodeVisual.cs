@@ -378,7 +378,9 @@ public partial class MainWindow : Window
         {
             var cols = FetchColumns(node);
             acb.ItemsSource = cols;
-            acb.PlaceholderText = cols.Count == 0 ? "connect a table to see its columns" : null;   // suggestions come only from wired frames
+            acb.PlaceholderText = cols.Count > 0 ? null
+                : HasFrameInput(node) ? "connect a table to see its columns"
+                : "wire this into a node that has a table to see its columns";   // suggestions come only from wired frames
             // post the open: setting it synchronously in GotFocus gets overridden by the control's own focus handling
             if (cols.Count > 0)
                 Avalonia.Threading.Dispatcher.UIThread.Post(() => acb.IsDropDownOpen = true);
