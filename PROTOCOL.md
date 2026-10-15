@@ -2,9 +2,9 @@
 
 The contract between the Python backend (`nota.server`) and any frontend (Avalonia, …).
 **This file is the source of truth.** The three JSON shapes below are the only coupling
-between the two sides — change one and both sides must agree.
+between the two sides.
 
-**Version: 1.5** (`nota.server.PROTOCOL_VERSION`)
+**Version: 1.7** (`nota.server.PROTOCOL_VERSION`)
 
 ## Versioning policy
 
@@ -61,8 +61,12 @@ response : {"id": <same>, "result": <json>} | {"id": <same>, "error": {"message"
 - **1.1 additions** (all optional): `examples` (str, may be `""`), `doc_url` (str or `null`),
   per-port/per-param `doc` (str, may be `""`), and `choices` (list of str) present only on enum params
   (reflected from a `Literal[...]` annotation) — the frontend renders a dropdown when it's present.
-- **1.3**: an optional `widget` (str) on a param names a special frontend editor instead of a textbox
-  (e.g. `"kvlist"` for `dict.build`'s `entries` — a key/value row editor). Additive; omit for a plain widget.
+- **1.3**: an optional `widget` (str) on a param names a special frontend editor instead of a textbox.
+- **1.7**: `widget` values `column`, `columns` and `sort` mark a param holding one column name / a comma list of column names / a comma list with optional `desc`|`asc` suffixes; the frontend renders chips.
+  Values: `"kvlist"` (a key/value row editor, e.g. `dict.build`'s `entries`) and `"code"` (a multiline
+  code editor, e.g. `transform.sql` / `transform.python` / `expr.sql`). Additive; omit for a plain textbox.
+- **1.6**: an optional `aliases` (list of str) — search synonyms for the palette (e.g. `["distinct", "dedupe"]`
+  on `LazyFrame.unique`). Present only when the kind has synonyms; the frontend matches them like the label.
 
 ## Shape 1b — composite definition (`create_node` param, **1.5**)
 
@@ -111,3 +115,10 @@ reloads into the palette every session.
 - **1.2**: a new preview type `html` (a `sink.plot.*` node returns a standalone HTML document with
   inlined JS). Additive — a frontend renders it in a webview; older ones ignore the unknown type.
 - `shape`: `[nrows_or_null, ncols]` — `nrows` is `null` only when a lazy frame is truncated.
+- **1.6**: every payload (including error payloads) also carries `ms` (float, always — the node's own
+  compute time) and `log` (str, optional — the node's captured stdout + warnings, present only when
+  non-empty). Honesty note: `ms` is the node's *own* compute. Lazy polars nodes only build a plan
+  (≈0 ms) and are materialized together at preview time; eager nodes (stats, Python, plots, writes,
+  imported) show real cost. A failing node's `log` is the most useful — it holds its prints.
+- **1.6**: `preview` and `schema` evaluate only the target node's ancestors (a "run to here"), so an
+  unrelated failing branch elsewhere in the graph does not affect them.

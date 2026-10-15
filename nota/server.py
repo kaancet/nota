@@ -44,7 +44,7 @@ from nota.core.registry import REGISTRY
 # Bump on any change to the message shapes (see PROTOCOL.md):
 #   minor -> additive/backward-compatible (new optional field or method)
 #   major -> breaking (renamed/removed field, changed meaning)
-PROTOCOL_VERSION = "1.6"
+PROTOCOL_VERSION = "1.7"
 
 
 def _missing_input(spec, n) -> Any:
@@ -213,16 +213,28 @@ def _frame_inputs(g: Graph, nid: str) -> list[tuple[str, str]]:
 def _frame_sources(g: Graph, nid: str) -> list[str]:
     return [src for _, src in _frame_inputs(g, nid)]
 
+
+def _input_schema(params: dict) -> dict[str, dict[str, str]]:
+    """{port: {column: dtype}} of the table(s) wired into a node (expression nodes: port "*" = the
+    frame their consumer receives). Column order is the table's. {} when nothing is connected."""
     g = Graph.from_dict(params["graph"])
     nid = params["node_id"]
     if nid not in g.nodes:
-        return []
-    cols: set[str] = set()
-    for src in _frame_sources(g, nid):
-        cache, errors, _ = _run_capture(g.upto(src))
-        if src not in errors and cache.get(src) is not None:
-            cols |= set(schema_of(cache[src]).keys())
-    return sorted(cols)
+        return {}
+    out: dict[str, dict[str, str]] = {}
+    seen: dict[str, dict[str, str]] = {}
+    for port, src in _frame_inputs(g, nid):
+        if src not in seen:
+            cache, errors, _ = _run_capture(g.upto(src))
+            ok = src not in errors and cache.get(src) is not None
+            seen[src] = schema_of(cache[src]) if ok else {}
+        out.setdefault(port, {}).update(seen[src])
+    return out
+
+
+def _columns(params: dict) -> list[str]:
+    """Column names relevant to a node -- feeds the frontend's column-name dropdown."""
+    return sorted({c for sch in _input_schema(params).values() for c in sch})
 
 
 def _import_node(params: dict) -> dict:
@@ -260,6 +272,7 @@ HANDLERS = {
     "preview": _preview,
     "schema": _schema,
     "columns": _columns,
+    "input_schema": _input_schema,
     "validate": _validate,
     "import_node": _import_node,
     "create_node": _create_node,

@@ -27,7 +27,7 @@ def test_protocol_version_handshake():
     r = handle({"id": 1, "method": "server_info"})
     assert r["result"]["protocol_version"] == PROTOCOL_VERSION
     methods = set(r["result"]["methods"])
-    assert {"run_graph", "columns", "import_node", "create_node"} <= methods
+    assert {"run_graph", "columns", "input_schema", "import_node", "create_node"} <= methods
 
 
 def test_protocol_md_version_matches():

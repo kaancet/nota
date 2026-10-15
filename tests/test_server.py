@@ -131,6 +131,36 @@ def test_columns_expression_node_without_consumer_or_frame():
     g.connect("src", "flt", "self")
     assert _columns_of(g, "col") == ["g", "v"]       # now wired: resolves through Expr.gt to filter's frame
 
+
+def _schema_of_inputs(g, nid):
+    return handle({"id": 1, "method": "input_schema", "params": {"graph": g.to_dict(), "node_id": nid}})["result"]
+
+
+def test_input_schema_per_port_with_types():
+    @node("test.right_src", "Test")
+    def _right() -> pl.LazyFrame:
+        return pl.LazyFrame({"g": ["a"], "label": ["A"], "w": [1.5]})
+
+    g = Graph().add("l", "test.source").add("r", "test.right_src").add("j", "simple.join", {"on": "g"})
+    assert _schema_of_inputs(g, "j") == {}                                    # nothing wired -> nothing
+    g.connect("l", "j", "left")
+    g.connect("r", "j", "right")
+    sch = _schema_of_inputs(g, "j")
+    assert sch["left"] == {"g": "String", "v": "Int64"}
+    assert list(sch["right"]) == ["g", "label", "w"]                         # table order preserved
+    assert sch["right"]["w"] == "Float64"
+
+
+def test_input_schema_expression_node_uses_star_port():
+    g = (Graph().add("src", "test.source").add("col", "expr.column", {"name": "v"})
+         .add("gt", "Expr.gt", {"other": 1}).add("flt", "LazyFrame.filter"))
+    g.connect("src", "flt", "self")
+    g.connect("col", "gt", "self")
+    g.connect("gt", "flt", "predicates")
+    assert _schema_of_inputs(g, "col") == {"*": {"g": "String", "v": "Int64"}}
+    assert _schema_of_inputs(g, "flt") == {"self": {"g": "String", "v": "Int64"}}
+
+
 def test_columns_through_group_by_to_agg():
     # agg's `self` comes from group_by (a LazyGroupBy, not a table): columns are the grouped table's
     g = (Graph().add("src", "test.source").add("gb", "LazyFrame.group_by").add("by", "expr.column", {"name": "g"})
