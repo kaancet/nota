@@ -71,6 +71,7 @@ public partial class MainWindow : Window
             StatusText.Text = errors == 0
                 ? $"ran ✓ · {_results.Count} nodes · {total} ms"
                 : $"ran · {errors} error(s) · {total} ms" + (slowestMs >= 0 ? $" · slowest: {slowest} {slowestMs} ms" : "");
+            RefreshChipTypes();    // column chips: dtypes follow the new schemas
             RefreshHighlights();   // red/amber failed nodes
             RefreshOutput();       // update the output panel for whatever's selected
         }
@@ -107,6 +108,7 @@ public partial class MainWindow : Window
             StatusText.Text = payload.TryGetProperty("error", out _)
                 ? $"ran to {only.Type.Label}: error"
                 : $"ran to {only.Type.Label} · {ms} ms";
+            RefreshChipTypes();
             RefreshHighlights();
             RefreshOutput();
         }

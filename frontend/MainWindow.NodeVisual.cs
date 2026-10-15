@@ -285,6 +285,7 @@ public partial class MainWindow : Window
 
     private Control ParamRow(NodeInstance node, ParamSpec p, Action? refreshLayout = null)
     {
+        if (IsChipWidget(p)) return ChipWidget(node, p, refreshLayout);   // column / columns / sort chips
         if (p.Widget == "kvlist") return BuildKvList(node, p, refreshLayout);   // dynamic key/value row editor (dict.build)
         if (p.Widget == "code") return CodeWidget(node, p);   // multiline editor (transform.sql/python, expr.sql)
         if (p.Type == "bool") return BoolWidget(node, p);   // checkbox carries its own label
@@ -822,10 +823,47 @@ public partial class MainWindow : Window
             row++;
         }
 
+        // second tab: the dtype colors of the column chips
+        var dtGrid = new Grid { Margin = new Thickness(16), ColumnDefinitions = new ColumnDefinitions("Auto,*") };
+        var dtNote = new TextBlock
+        {
+            Text = "Column chips take the color of their data type.", FontSize = 12,
+            Foreground = ThemeSubtext, Margin = new Thickness(0, 0, 0, 12),
+        };
+        dtGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+        Grid.SetRow(dtNote, 0); Grid.SetColumnSpan(dtNote, 2);
+        dtGrid.Children.Add(dtNote);
+        int dtRow = 1;
+        foreach (var (family, fill, border, dtypes) in DtypeFamilies)
+        {
+            dtGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+            var sample = new Border
+            {
+                Background = Brush(fill), BorderBrush = Brush(border), BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(6), Padding = new Thickness(10, 3), Margin = new Thickness(0, 3, 12, 3),
+                VerticalAlignment = VerticalAlignment.Center,
+                Child = new TextBlock { Text = family, FontSize = 12, Foreground = Brushes.Black },
+            };
+            Grid.SetRow(sample, dtRow); Grid.SetColumn(sample, 0);
+            dtGrid.Children.Add(sample);
+            var dtLabel = new TextBlock { Text = dtypes, FontSize = 13, VerticalAlignment = VerticalAlignment.Center, Foreground = ThemeSubtext };
+            Grid.SetRow(dtLabel, dtRow); Grid.SetColumn(dtLabel, 1);
+            dtGrid.Children.Add(dtLabel);
+            dtRow++;
+        }
+
         _legendWindow = new Window
         {
-            Title = "Port Legend", Width = 380, Height = 40 + row * 28, SizeToContent = SizeToContent.Height,
-            Content = grid, WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Title = "Legend", Width = 420, SizeToContent = SizeToContent.Height,
+            Content = new TabControl
+            {
+                Items =
+                {
+                    new TabItem { Header = "Port types", Content = grid },
+                    new TabItem { Header = "Data types", Content = dtGrid },
+                },
+            },
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
         };
         _legendWindow.Closed += (_, _) => _legendWindow = null;
         _legendWindow.Show(this);

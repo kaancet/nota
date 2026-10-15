@@ -151,7 +151,7 @@ public partial class MainWindow : Window
         SavedGraph? doc = JsonSerializer.Deserialize<SavedGraph>(json);
         if (doc is null) { StatusText.Text = "load error: empty file"; return; }
 
-        if (!_restoring) { _undo.Clear(); _redo.Clear(); }   // a fresh user load starts a new history
+        if (!_restoring) { _undo.Clear(); _redo.Clear(); _colTypes.Clear(); }   // a fresh user load starts a new history
         ClearGraph();
         var byId = new Dictionary<string, NodeInstance>();
         int skipped = 0;
@@ -200,6 +200,7 @@ public partial class MainWindow : Window
         _selWires.Clear();
         _selBoxes.Clear();
         _results = new Dictionary<string, JsonElement>();
+        _chipViews.Clear();   // the old visuals are gone; new chip widgets re-register
         InfoArea.Content = new TextBlock { Text = "(click a node)", Foreground = ThemeSubtext };
         RefreshOutput();
         UpdateEmptyHint();
