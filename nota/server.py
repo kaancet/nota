@@ -156,23 +156,42 @@ def _schema(params: dict) -> dict:
     return schema_of(cache[node_id])
 
 
-def _frame_sources(g: Graph, nid: str) -> list[str]:
-    """Source node id(s) whose columns `nid` could refer to: the frame it feeds.
+def _frame_inputs(g: Graph, nid: str) -> list[tuple[str, str]]:
+    """(port, table node id) pairs whose columns `nid` could refer to: only frames actually wired in.
+    Expression nodes have no frame port of their own; their pairs use the port name "*".
 
-    An expr node (e.g. expr.column) has no frame input, so walk downstream to the first
-    node with a wired frame port and take that port's source. Fall back to every source
-    frame in the graph when nothing downstream consumes a frame yet.
+    - A node with a frame input sees the frame(s) wired into it (none wired -> none).
+    - A node without one (an expression, e.g. expr.column) sees the frame its consumer
+      receives: walk downstream through expression nodes to the first node with a frame input.
+    - Otherwise nothing: no guessing from unrelated sources on the canvas.
     """
-    def wired_frame_srcs(x: str) -> list[str]:
-        n = g.nodes[x]
-        spec = REGISTRY.get(n.kind)
-        if spec is None:
-            return []
-        return [src for p in spec.inputs if p.type == "frame" for src, _ in n.inputs.get(p.name, [])]
+    def frame_ports(x: str) -> list[str]:
+        spec = REGISTRY.get(g.nodes[x].kind)
+        return [p.name for p in spec.inputs if p.type == "frame"] if spec else []
 
-    hit = wired_frame_srcs(nid)
-    if hit:
-        return hit
+    def raw_wired(x: str, ports: list[str]) -> list[str]:
+        return [src for p in ports for src, _ in g.nodes[x].inputs.get(p, [])]
+
+    def table_of(x: str) -> str:
+        """A node whose output isn't a table (group_by -> LazyGroupBy) passes through:
+        use the table it was built from, so agg's columns are the grouped table's."""
+        seen: set[str] = set()
+        while x not in seen:
+            seen.add(x)
+            spec = REGISTRY.get(g.nodes[x].kind)
+            if spec is None or not spec.outputs or spec.outputs[0].type == "frame":
+                break
+            up = raw_wired(x, frame_ports(x))
+            if not up:
+                break
+            x = up[0]
+        return x
+
+    def wired(x: str, ports: list[str]) -> list[str]:
+        return [table_of(src) for src in raw_wired(x, ports)]
+
+    if ports := frame_ports(nid):
+        return [(p, table_of(src)) for p in ports for src, _ in g.nodes[nid].inputs.get(p, [])]
     # ponytail: BFS to the first frame consumer; ambiguity (two frames) -> union. Good enough until someone complains.
     children: dict[str, list[str]] = {k: [] for k in g.nodes}
     for k, n in g.nodes.items():
@@ -185,16 +204,15 @@ def _frame_sources(g: Graph, nid: str) -> list[str]:
         if x in seen:
             continue
         seen.add(x)
-        hit = wired_frame_srcs(x)
-        if hit:
-            return hit
+        if ports := frame_ports(x):
+            return [("*", src) for src in wired(x, ports)]   # the consumer defines the frame context, wired or not
         queue += children[x]
-    return [k for k, n in g.nodes.items()
-            if not n.inputs and (s := REGISTRY.get(n.kind)) and s.outputs and s.outputs[0].type == "frame"]
+    return []
 
 
-def _columns(params: dict) -> list[str]:
-    """Column names relevant to a node -- feeds the frontend's column-name dropdown."""
+def _frame_sources(g: Graph, nid: str) -> list[str]:
+    return [src for _, src in _frame_inputs(g, nid)]
+
     g = Graph.from_dict(params["graph"])
     nid = params["node_id"]
     if nid not in g.nodes:

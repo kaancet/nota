@@ -3,9 +3,11 @@ No subprocess needed -- the dispatch is pure."""
 
 import json
 
+import polars as pl
+
 from helpers import _test_source  # noqa: F401  (registers test.source)
 
-from nota.core import Graph
+from nota.core import Graph, node
 from nota.server import handle
 
 
@@ -95,6 +97,51 @@ def test_columns_walks_to_the_frame():
     assert call("flt") == ["g", "v"]
     empty = handle({"id": 2, "method": "columns", "params": {"graph": {"nodes": []}, "node_id": "x"}})
     assert empty["result"] == []
+
+
+def _columns_of(g, nid):
+    return handle({"id": 1, "method": "columns", "params": {"graph": g.to_dict(), "node_id": nid}})["result"]
+
+
+def test_columns_only_from_wired_frames():
+    # a source sits on the canvas, but nothing is wired to the node -> no suggestions (no canvas-wide guess)
+    g = Graph().add("src", "test.source").add("f", "simple.filter")
+    assert _columns_of(g, "f") == []
+    g.connect("src", "f", "frame")
+    assert _columns_of(g, "f") == ["g", "v"]
+
+
+def test_columns_ignores_unrelated_sources():
+    @node("test.other_source", "Test")
+    def _other() -> pl.LazyFrame:
+        return pl.LazyFrame({"zzz": [1]})
+
+    g = Graph().add("a", "test.source").add("b", "test.other_source").add("f", "simple.sort")
+    g.connect("b", "f", "frame")
+    assert _columns_of(g, "f") == ["zzz"]            # only the wired one, not "g"/"v" from the other source
+
+
+def test_columns_expression_node_without_consumer_or_frame():
+    g = Graph().add("src", "test.source").add("col", "expr.column", {"name": "v"})
+    assert _columns_of(g, "col") == []               # feeds nothing: no fallback to src
+    g.add("gt", "Expr.gt", {"other": 1}).add("flt", "LazyFrame.filter")
+    g.connect("col", "gt", "self")
+    g.connect("gt", "flt", "predicates")
+    assert _columns_of(g, "col") == []               # consumer's frame is unwired -> still nothing
+    g.connect("src", "flt", "self")
+    assert _columns_of(g, "col") == ["g", "v"]       # now wired: resolves through Expr.gt to filter's frame
+
+def test_columns_through_group_by_to_agg():
+    # agg's `self` comes from group_by (a LazyGroupBy, not a table): columns are the grouped table's
+    g = (Graph().add("src", "test.source").add("gb", "LazyFrame.group_by").add("by", "expr.column", {"name": "g"})
+         .add("agg", "LazyGroupBy.agg").add("c", "expr.column", {"name": "v"}).add("sm", "Expr.sum"))
+    g.connect("src", "gb", "self")
+    g.connect("by", "gb", "by")
+    g.connect("gb", "agg", "self")
+    g.connect("c", "sm", "self")
+    g.connect("sm", "agg", "aggs")
+    assert _columns_of(g, "by") == ["g", "v"]
+    assert _columns_of(g, "c") == ["g", "v"]          # via Expr.sum -> agg -> group_by -> src
 
 
 def test_preview_prunes_to_ancestors():

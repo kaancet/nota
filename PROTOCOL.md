@@ -34,6 +34,8 @@ response : {"id": <same>, "result": <json>} | {"id": <same>, "error": {"message"
 | `run_graph` | `{graph, n?}` | `{node_id: preview \| {error}}` |
 | `preview` | `{graph, node_id, n?}` | one **preview payload** |
 | `schema` | `{graph, node_id}` | `{col: dtype_string}` |
+| `columns` | `{graph, node_id}` | `[str]` — column names relevant to that node: only the frame(s) wired into it, or into the node that consumes it (expression nodes); `[]` when nothing is connected — **1.6** |
+| `input_schema` | `{graph, node_id}` | `{port: {column: dtype_string}}` — the table(s) wired into that node, column order preserved; expression nodes use port `"*"` (the frame their consumer receives); `{}` when nothing is connected — **1.7** |
 | `validate` | `{graph}` | `{ok: bool, issues: [{node?, issue}]}` |
 | `import_node` | `{path}` | one **node schema** (a user `.py` with a single function, registered as category `Imported`) — **1.4** |
 | `create_node` | `{definition}` | one **node schema** (a composite/macro node: a saved sub-graph registered as category `User generated`, persisted to the user dir) — **1.5** |
