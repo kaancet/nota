@@ -18,7 +18,7 @@ def _pipeline() -> dict:
 def test_get_manifest():
     r = handle({"id": 1, "method": "get_manifest", "params": {"tier": "common"}})
     kinds = {e["kind"] for e in r["result"]}
-    assert "sink.preview" in kinds and "LazyFrame.filter" in kinds
+    assert "sink.preview" in kinds and "simple.filter" in kinds
     json.dumps(r)                                   # response is wire-safe
 
 

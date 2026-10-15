@@ -611,6 +611,7 @@ public partial class MainWindow : Window
         "Source" => Brush("#2E7D32"),
         "Sink" => Brush("#6A1B9A"),
         "Transform" => Brush("#1565C0"),
+        "Basics" => Brush("#1565C0"),      // simple.* nodes
         "Aggregate" => Brush("#EF6C00"),
         "Column" => Brush("#00838F"),
         "Literal" => Brush("#546E7A"),

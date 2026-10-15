@@ -524,6 +524,7 @@ def manifest(tier: str = "all") -> list[dict]:
         if e is None or (tier == "common" and e["tier"] != "common"):
             continue
         out.append(e)
+    out.sort(key=lambda e: e["category"] != "Basics")  # stable: the Basics category leads the palette
     return out
 
 

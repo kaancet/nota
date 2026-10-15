@@ -46,7 +46,7 @@ def test_response_envelope_shape():
 
 
 def test_node_schema_shape():
-    entry = next(e for e in manifest("common") if e["kind"] == "LazyFrame.filter")
+    entry = next(e for e in manifest("all") if e["kind"] == "LazyFrame.filter")
     assert _has(NODE_SCHEMA_KEYS, entry)
     assert _has(PORT_KEYS, entry["inputs"][0])
     assert entry["inputs"][0]["type"] in {"frame", "expr", "series", "scalar", "any"}

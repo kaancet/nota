@@ -10,8 +10,11 @@ def test_common_is_small_and_labeled():
     assert 30 < len(common) < 120
     for e in common:
         assert e["tier"] == "common" and e["label"] and e["category"]
-    filt = next(e for e in common if e["kind"] == "LazyFrame.filter")
-    assert (filt["category"], filt["label"]) == ("Transform", "Filter")
+    filt = next(e for e in common if e["kind"] == "simple.filter")
+    assert (filt["category"], filt["label"]) == ("Basics", "Filter rows")
+    # the expression-wiring op is demoted to advanced (palette hides it) but stays registered/runnable
+    assert "LazyFrame.filter" not in {e["kind"] for e in common}
+    assert next(e for e in manifest("all") if e["kind"] == "LazyFrame.filter")["tier"] == "advanced"
 
 
 def test_eager_families_hidden_but_runnable():
@@ -29,12 +32,12 @@ def test_catalog_groups_by_category():
 
 def test_aliases_on_manifest():
     m = {e["kind"]: e for e in manifest("common")}
-    assert "distinct" in m["LazyFrame.unique"]["aliases"]   # synonym search data
+    assert "distinct" in m["simple.remove_duplicates"]["aliases"]   # synonym search data
     assert "aliases" not in m["source.sample"]              # a node with no synonyms: no key
 
 
 def test_manifest_enrichment():
-    m = {e["kind"]: e for e in manifest("common")}
+    m = {e["kind"]: e for e in manifest("all")}   # reflected LazyFrame ops are advanced tier now
     # #5 examples + doc_url derived from the reflected member
     f = m["LazyFrame.filter"]
     assert f["doc_url"].endswith("polars.LazyFrame.filter.html")

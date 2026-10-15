@@ -60,21 +60,27 @@ COMMON: dict[str, tuple[str, str]] = {
     "expr.const_int": ("Literal", "Integer"),
     "expr.const_float": ("Literal", "Float"),
     "expr.const_str": ("Literal", "String"),
-    # Transform (LazyFrame)
-    "LazyFrame.filter": ("Transform", "Filter"),
-    "LazyFrame.select": ("Transform", "Select"),
-    "LazyFrame.with_columns": ("Transform", "With columns"),
-    "LazyFrame.drop": ("Transform", "Drop"),
-    "LazyFrame.rename": ("Transform", "Rename"),
-    "LazyFrame.sort": ("Transform", "Sort"),
-    "LazyFrame.unique": ("Transform", "Unique"),
+    # Transform (LazyFrame): only the already-simple one stays common; the expr-wiring ops
+    # (filter/select/with_columns/...) are advanced and replaced by the simple.* nodes below
     "LazyFrame.head": ("Transform", "Head"),
-    "LazyFrame.drop_nulls": ("Transform", "Drop nulls"),
-    "LazyFrame.fill_null": ("Transform", "Fill nulls"),
-    "LazyFrame.join": ("Transform", "Join"),
-    "LazyFrame.group_by": ("Transform", "Group by"),
+    # Basics: simple.* nodes, one self-contained step each (text/dropdown params, no expression wiring)
+    "simple.filter": ("Basics", "Filter rows"),
+    "simple.filter_expression": ("Basics", "Filter (expression)"),
+    "simple.sort": ("Basics", "Sort rows"),
+    "simple.drop_missing": ("Basics", "Drop missing rows"),
+    "simple.fill_missing": ("Basics", "Fill missing"),
+    "simple.remove_duplicates": ("Basics", "Remove duplicates"),
+    "simple.add_column": ("Basics", "Add column"),
+    "simple.keep_columns": ("Basics", "Keep columns"),
+    "simple.drop_columns": ("Basics", "Remove columns"),
+    "simple.rename_columns": ("Basics", "Rename columns"),
+    "simple.change_type": ("Basics", "Change type"),
+    "simple.summarize": ("Basics", "Summarize by group"),
+    "simple.wide_to_long": ("Basics", "Wide → long"),
+    "simple.long_to_wide": ("Basics", "Long → wide"),
+    "simple.join": ("Basics", "Join tables"),
+    "simple.append_rows": ("Basics", "Stack tables"),
     # Aggregate
-    "LazyGroupBy.agg": ("Aggregate", "Aggregate"),
     "Expr.sum": ("Aggregate", "Sum"),
     "Expr.mean": ("Aggregate", "Mean"),
     "Expr.min": ("Aggregate", "Min"),
@@ -147,6 +153,29 @@ WIDGETS: dict[str, dict[str, str]] = {
     "transform.sql": {"query": "code"},  # multiline code editor
     "transform.python": {"code": "code"},
     "expr.sql": {"expression": "code"},
+    # simple.*: "column" / "columns" / "sort" = chips picked from the connected table; "code" =
+    # multiline editor for long text; "text" = plain box (no column autocomplete).
+    "simple.filter": {"column": "column", "value": "text"},
+    "simple.filter_expression": {"condition": "code"},
+    "simple.sort": {"by": "sort"},
+    "simple.drop_missing": {"columns": "columns"},
+    "simple.fill_missing": {"columns": "columns", "value": "text"},
+    "simple.remove_duplicates": {"columns": "columns"},
+    "simple.add_column": {"expression": "code"},
+    "simple.keep_columns": {"columns": "columns"},
+    "simple.drop_columns": {"columns": "columns"},
+    "simple.rename_columns": {"mapping": "text"},
+    "simple.change_type": {"columns": "columns", "format": "text"},
+    "simple.summarize": {"by": "columns", "metrics": "code"},
+    "simple.wide_to_long": {
+        "id_columns": "columns",
+        "value_columns": "columns",
+        "variable_name": "text",
+        "value_name": "text",
+    },
+    "simple.long_to_wide": {"index": "columns", "names_from": "column", "values_from": "column"},
+    "simple.join": {"on": "columns"},
+    "expr.column": {"name": "column"},
 }
 
 
@@ -173,6 +202,25 @@ ALIASES: dict[str, list[str]] = {
     "sink.preview": ["show", "table", "view"],
     "sink.write_csv": ["export", "save csv"],
     "source.csv": ["load", "open", "import csv"],
+    "simple.filter": ["where", "subset", "select rows", "keep rows", "condition"],
+    "simple.filter_expression": ["where", "or", "and", "condition", "sql"],
+    "simple.sort": ["order by", "arrange", "rank"],
+    "simple.drop_missing": ["dropna", "remove missing", "remove empty", "complete cases", "nan", "null"],
+    "simple.fill_missing": ["fillna", "impute", "replace missing", "interpolate", "nan", "null"],
+    "simple.remove_duplicates": ["distinct", "dedupe", "unique", "drop duplicates"],
+    "simple.add_column": ["mutate", "compute", "calculate", "formula", "derive", "new column", "with columns"],
+    "simple.keep_columns": ["select", "choose columns", "subset columns", "project"],
+    "simple.drop_columns": ["delete column", "remove column", "drop"],
+    "simple.rename_columns": ["relabel", "column name"],
+    "simple.change_type": ["cast", "convert", "parse date", "as number", "astype", "dtype"],
+    "simple.summarize": [
+        "group by", "groupby", "aggregate", "average", "mean", "count", "pivot table", "descriptives",
+        "summarise", "statistics", "sd", "sem",
+    ],
+    "simple.wide_to_long": ["melt", "unpivot", "stack", "tidy", "gather"],
+    "simple.long_to_wide": ["pivot", "spread", "unstack", "cross tab"],
+    "simple.join": ["merge", "lookup", "vlookup", "combine", "match"],
+    "simple.append_rows": ["concat", "union", "append", "bind rows", "combine files", "merge files"],
 }
 
 
